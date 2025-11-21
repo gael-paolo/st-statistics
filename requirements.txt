@@ -1,0 +1,11 @@
+streamlit
+pandas
+numpy
+scipy
+matplotlib
+seaborn
+statsmodels
+ydata-profiling
+google-generativeai
+openpyxl
+setuptools
