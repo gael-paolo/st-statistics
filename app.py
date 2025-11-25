@@ -17,14 +17,14 @@ import os
 
 # Configuración de la página
 st.set_page_config(
-    page_title="People Analytics Assistant",
+    page_title="People Analytics Statistics",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # Título principal
-st.title("🤖 Asistente de People Analytics con Gemini")
+st.title("🤖 People Analytics Stats Bot")
 st.markdown("""
 Esta aplicación te ayuda a realizar análisis estadísticos descriptivos e inferenciales para People Analytics.
 Carga tus datos y consulta a Gemini qué análisis realizar, luego ejecuta las funciones disponibles.
