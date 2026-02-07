@@ -16,7 +16,7 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 from ydata_profiling import ProfileReport
 import io
-import openai
+from openai import OpenAI
 import os
 import sys
 import traceback
@@ -44,21 +44,27 @@ st.sidebar.header("🔧 Configuración")
 st.sidebar.subheader("Configuración de OpenAI")
 openai_api_key = st.sidebar.text_input("Ingresa tu API Key de OpenAI:", type="password")
 
+# Variable global para el cliente OpenAI
+openai_client = None
+
 if openai_api_key:
     try:
-        openai.api_key = openai_api_key
+        openai_client = OpenAI(api_key=openai_api_key)
         st.sidebar.success("✅ OpenAI configurado correctamente")
     except Exception as e:
         st.sidebar.error(f"Error configurando OpenAI: {e}")
 else:
     st.sidebar.warning("⚠️ Ingresa tu API Key de OpenAI para usar las recomendaciones")
 
-# Función para consultar a OpenAI
-def consultar_openai(prompt, max_tokens=1500, temperature=0.7):
+# Función para consultar a OpenAI (CORREGIDA para OpenAI >= 1.0.0)
+def consultar_openai(prompt, max_tokens=1500, temperature=0.7, model="gpt-4"):
     """Consulta a OpenAI GPT para obtener recomendaciones y explicaciones"""
     try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",  # Puedes cambiar a gpt-3.5-turbo si prefieres
+        if not openai_client:
+            return "Error: Cliente OpenAI no configurado. Por favor, ingresa tu API Key en la barra lateral."
+        
+        response = openai_client.chat.completions.create(
+            model=model,
             messages=[
                 {"role": "system", "content": "Eres un experto en estadística aplicada y análisis de datos. Proporciona explicaciones claras, precisas y prácticas."},
                 {"role": "user", "content": prompt}
@@ -69,6 +75,24 @@ def consultar_openai(prompt, max_tokens=1500, temperature=0.7):
         return response.choices[0].message.content
     except Exception as e:
         return f"Error al consultar OpenAI: {str(e)}"
+
+# Función alternativa para versiones antiguas de OpenAI (mantener compatibilidad)
+def consultar_openai_legacy(prompt, max_tokens=1500, temperature=0.7, model="gpt-4"):
+    """Función alternativa para compatibilidad con versiones antiguas"""
+    try:
+        import openai as openai_old
+        response = openai_old.ChatCompletion.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "Eres un experto en estadística aplicada y análisis de datos. Proporcionas explicaciones claras, precisas y prácticas."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"Error con API antigua: {str(e)}"
 
 # ASISTENTE TEÓRICO EN ESTADÍSTICA
 st.subheader("📚 Asistente Teórico en Estadística")
@@ -123,7 +147,17 @@ if st.button("Consultar teoría estadística", key="theory_consultation_main") a
                 st.markdown("---")
                 
             except Exception as e:
-                st.error(f"Error en la consulta teórica: {e}")
+                # Intentar con API antigua como fallback
+                try:
+                    import openai as openai_old
+                    openai_old.api_key = openai_api_key
+                    response = consultar_openai_legacy(prompt)
+                    st.success("📚 Respuesta del Experto en Estadística (API legacy):")
+                    st.markdown("---")
+                    st.markdown(response)
+                    st.markdown("---")
+                except:
+                    st.error(f"Error en la consulta teórica: {e}")
     else:
         st.error("🔑 Necesitas configurar tu API Key de OpenAI en la barra lateral para usar el asistente teórico")
 
