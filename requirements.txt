@@ -9,3 +9,4 @@ ydata-profiling
 google-generativeai
 openpyxl
 setuptools
+openai
