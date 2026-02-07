@@ -22,7 +22,7 @@ except ImportError:
     GENAI_AVAILABLE = False
 
 try:
-    import openai
+    from openai import OpenAI
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -86,8 +86,8 @@ elif ai_provider == "OpenAI":
         )
         if openai_api_key:
             try:
-                openai.api_key = openai_api_key
-                ai_client = {"type": "openai", "model": openai_model}
+                # Nueva API de OpenAI >= 1.0.0
+                ai_client = OpenAI(api_key=openai_api_key)
                 ai_configured = True
                 st.sidebar.success(f"✅ OpenAI ({openai_model}) configurado correctamente")
             except Exception as e:
@@ -125,8 +125,9 @@ def consultar_ia(prompt, max_tokens=800):
             return response.text
             
         elif ai_provider == "OpenAI":
-            response = openai.ChatCompletion.create(
-                model=ai_client["model"],
+            # Nueva API de OpenAI >= 1.0.0
+            response = ai_client.chat.completions.create(
+                model=openai_model,
                 messages=[
                     {"role": "system", "content": "Eres un experto en estadística. Responde de manera concisa, directa y práctica. Máximo 3-4 puntos clave."},
                     {"role": "user", "content": prompt}
