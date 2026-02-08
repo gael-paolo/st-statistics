@@ -3247,14 +3247,14 @@ if df is not None:
                             for i, name in enumerate(group_names):
                                 mean_val = groups_data[i].mean()
                                 ax1.text(i, mean_val, f'{mean_val:.2f}', 
-                                       ha='center', va='bottom', fontweight='bold')
+                                    ha='center', va='bottom', fontweight='bold')
                             
                             # Gráfico de medias con barras de error
                             means = [d.mean() for d in groups_data]
                             errors = [stats.sem(d) for d in groups_data]
                             
                             bars = ax2.bar(group_names, means, yerr=errors, capsize=10, alpha=0.7, 
-                                         color='skyblue', edgecolor='black')
+                                        color='skyblue', edgecolor='black')
                             ax2.set_title('Medias con Intervalos de Confianza', fontsize=14, fontweight='bold')
                             ax2.set_xlabel(cat_var)
                             ax2.set_ylabel(f'Media de {num_var}')
@@ -3265,20 +3265,20 @@ if df is not None:
                             for bar, mean in zip(bars, means):
                                 height = bar.get_height()
                                 ax2.text(bar.get_x() + bar.get_width()/2., height + height*0.02,
-                                       f'{mean:.2f}', ha='center', va='bottom', fontweight='bold')
+                                    f'{mean:.2f}', ha='center', va='bottom', fontweight='bold')
                             
                             # Agregar estadísticas F al gráfico
                             stats_text = f"F = {f_stat:.3f}\np = {p_value:.4f}\ndf = {df_between}, {df_within}"
                             ax2.text(0.02, 0.98, stats_text, transform=ax2.transAxes,
-                                   fontsize=11, verticalalignment='top',
-                                   bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+                                fontsize=11, verticalalignment='top',
+                                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
                             
                             plt.tight_layout()
                             st.pyplot(fig)
                             
                             # Interpretación con OpenAI
                             if openai_api_key and st.button("🤖 Obtener interpretación experta", 
-                                                          key="anova_oneway_ai", use_container_width=True):
+                                                        key="anova_oneway_ai", use_container_width=True):
                                 with st.spinner("Consultando al experto..."):
                                     prompt = f"""
                                     Como experto en estadística, interpreta los siguientes resultados de ANOVA de una vía:
@@ -3415,7 +3415,7 @@ if df is not None:
                                     results_df = pd.DataFrame({
                                         'Métrica': ['Estadístico F', 'p-valor', 'Grados libertad', 'Significativo'],
                                         'Valor': [f"{f_stat:.4f}", f"{p_value:.4f}", f"{df_between}, {df_within}",
-                                                 'Sí' if is_significant else 'No']
+                                                'Sí' if is_significant else 'No']
                                     })
                                     results_df.to_excel(writer, sheet_name='Resultados', index=False)
                                     
@@ -3457,16 +3457,30 @@ if df is not None:
                                 model = ols(formula, data=two_way_data).fit()
                                 anova_table = sm.stats.anova_lm(model, typ=2)
                                 
+                                # Renombrar columnas para consistencia
+                                anova_table = anova_table.rename(columns={
+                                    'sum_sq': 'Suma_cuadrados',
+                                    'df': 'Grados_libertad',
+                                    'F': 'Estadistico_F',
+                                    'PR(>F)': 'p_valor'
+                                })
+                                
+                                # Agregar columna de cuadrado medio si no existe
+                                if 'mean_sq' not in anova_table.columns and 'Suma_cuadrados' in anova_table.columns and 'Grados_libertad' in anova_table.columns:
+                                    anova_table['Cuadrado_medio'] = anova_table['Suma_cuadrados'] / anova_table['Grados_libertad']
+                                
                                 # Resultados principales
                                 st.markdown("### 📋 Resultados del ANOVA de Dos Vías")
                                 
-                                # Mostrar tabla ANOVA
-                                st.dataframe(anova_table, use_container_width=True)
+                                # Mostrar tabla ANOVA con formato
+                                display_table = anova_table.copy()
+                                display_table = display_table.round(4)
+                                st.dataframe(display_table, use_container_width=True)
                                 
                                 # Extraer resultados importantes
-                                main_effect1_p = anova_table.loc[f'C({cat_var})', 'PR(>F)'] if f'C({cat_var})' in anova_table.index else None
-                                main_effect2_p = anova_table.loc[f'C({cat_var2})', 'PR(>F)'] if f'C({cat_var2})' in anova_table.index else None
-                                interaction_p = anova_table.loc[f'C({cat_var}):C({cat_var2})', 'PR(>F)'] if f'C({cat_var}):C({cat_var2})' in anova_table.index else None
+                                main_effect1_p = anova_table.loc[f'C({cat_var})', 'p_valor'] if f'C({cat_var})' in anova_table.index else None
+                                main_effect2_p = anova_table.loc[f'C({cat_var2})', 'p_valor'] if f'C({cat_var2})' in anova_table.index else None
+                                interaction_p = anova_table.loc[f'C({cat_var}):C({cat_var2})', 'p_valor'] if f'C({cat_var}):C({cat_var2})' in anova_table.index else None
                                 
                                 # Resultados resumidos
                                 st.markdown("### 🎯 Significancia de los Efectos")
@@ -3523,7 +3537,6 @@ if df is not None:
                                 ax1.grid(True, alpha=0.3)
                                 
                                 # Heatmap de medias
-                                import seaborn as sns
                                 pivot_table = two_way_data.pivot_table(values=num_var, index=cat_var, columns=cat_var2, aggfunc='mean')
                                 sns.heatmap(pivot_table, annot=True, fmt=".2f", cmap='YlOrRd', ax=ax2)
                                 ax2.set_title(f'Heatmap de Medias por Combinación', fontsize=14, fontweight='bold')
@@ -3560,7 +3573,7 @@ if df is not None:
                                 
                                 # Interpretación con OpenAI
                                 if openai_api_key and st.button("🤖 Obtener interpretación experta", 
-                                                              key="anova_twoway_ai", use_container_width=True):
+                                                            key="anova_twoway_ai", use_container_width=True):
                                     with st.spinner("Consultando al experto..."):
                                         prompt = f"""
                                         Como experto en estadística, interpreta los siguientes resultados de ANOVA de dos vías:
@@ -3620,11 +3633,13 @@ if df is not None:
                                     
                                     for idx, row in anova_table.iterrows():
                                         report_twoway += f"\n- {idx}:"
-                                        report_twoway += f"\n  * Suma de cuadrados: {row['sum_sq']:.4f}"
-                                        report_twoway += f"\n  * Grados de libertad: {row['df']:.0f}"
-                                        report_twoway += f"\n  * Cuadrado medio: {row['mean_sq']:.4f}"
-                                        report_twoway += f"\n  * Estadístico F: {row['F']:.4f}"
-                                        report_twoway += f"\n  * p-valor: {row['PR(>F)']:.4f}"
+                                        report_twoway += f"\n  * Suma de cuadrados: {row['Suma_cuadrados']:.4f}"
+                                        report_twoway += f"\n  * Grados de libertad: {row['Grados_libertad']:.0f}"
+                                        if 'Cuadrado_medio' in row:
+                                            report_twoway += f"\n  * Cuadrado medio: {row['Cuadrado_medio']:.4f}"
+                                        if 'Estadistico_F' in row:
+                                            report_twoway += f"\n  * Estadístico F: {row['Estadistico_F']:.4f}"
+                                        report_twoway += f"\n  * p-valor: {row['p_valor']:.4f}"
                                     
                                     report_twoway += f"""
                                     
@@ -3707,7 +3722,7 @@ if df is not None:
                     st.error(f"Error en ANOVA: {e}")
         else:
             st.warning("Se necesitan variables numéricas y categóricas para ANOVA")
-    
+
     # ========================================================================
     # PESTAÑA 8: PRUEBAS NO PARAMÉTRICAS
     # ========================================================================
