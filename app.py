@@ -3440,9 +3440,268 @@ if df is not None:
                                 )
                     
                     elif anova_type == "Dos vías (Two-Way)" and cat_var2:
-                        st.info("ANOVA de dos vías implementado en la sección siguiente...")
-                        # Nota: Para mantener el código manejable, el ANOVA de dos vías completo
-                        # se implementa en una extensión separada
+                        # Implementación de ANOVA de dos vías
+                        st.markdown("### 📊 ANOVA de Dos Vías")
+                        
+                        # Filtrar datos completos
+                        two_way_data = df[[num_var, cat_var, cat_var2]].dropna()
+                        
+                        if len(two_way_data) < 2:
+                            st.error("Se necesitan al menos 2 observaciones completas")
+                        else:
+                            # Crear fórmula para ANOVA de dos vías
+                            formula = f'{num_var} ~ C({cat_var}) + C({cat_var2}) + C({cat_var}):C({cat_var2})'
+                            
+                            try:
+                                # Ejecutar ANOVA de dos vías
+                                model = ols(formula, data=two_way_data).fit()
+                                anova_table = sm.stats.anova_lm(model, typ=2)
+                                
+                                # Resultados principales
+                                st.markdown("### 📋 Resultados del ANOVA de Dos Vías")
+                                
+                                # Mostrar tabla ANOVA
+                                st.dataframe(anova_table, use_container_width=True)
+                                
+                                # Extraer resultados importantes
+                                main_effect1_p = anova_table.loc[f'C({cat_var})', 'PR(>F)'] if f'C({cat_var})' in anova_table.index else None
+                                main_effect2_p = anova_table.loc[f'C({cat_var2})', 'PR(>F)'] if f'C({cat_var2})' in anova_table.index else None
+                                interaction_p = anova_table.loc[f'C({cat_var}):C({cat_var2})', 'PR(>F)'] if f'C({cat_var}):C({cat_var2})' in anova_table.index else None
+                                
+                                # Resultados resumidos
+                                st.markdown("### 🎯 Significancia de los Efectos")
+                                
+                                col_effects1, col_effects2, col_effects3 = st.columns(3)
+                                
+                                with col_effects1:
+                                    if main_effect1_p is not None:
+                                        is_sig1 = main_effect1_p < alpha_anova
+                                        st.metric(
+                                            f"Efecto principal de {cat_var}",
+                                            "✅ Significativo" if is_sig1 else "❌ No significativo",
+                                            f"p = {main_effect1_p:.4f}"
+                                        )
+                                
+                                with col_effects2:
+                                    if main_effect2_p is not None:
+                                        is_sig2 = main_effect2_p < alpha_anova
+                                        st.metric(
+                                            f"Efecto principal de {cat_var2}",
+                                            "✅ Significativo" if is_sig2 else "❌ No significativo",
+                                            f"p = {main_effect2_p:.4f}"
+                                        )
+                                
+                                with col_effects3:
+                                    if interaction_p is not None:
+                                        is_sig_int = interaction_p < alpha_anova
+                                        st.metric(
+                                            f"Interacción {cat_var} × {cat_var2}",
+                                            "✅ Significativo" if is_sig_int else "❌ No significativo",
+                                            f"p = {interaction_p:.4f}"
+                                        )
+                                
+                                # Estadísticas descriptivas
+                                st.markdown("### 📊 Estadísticas Descriptivas por Combinación")
+                                
+                                # Calcular estadísticas para cada combinación
+                                combinations = two_way_data.groupby([cat_var, cat_var2])[num_var].agg(['count', 'mean', 'std', 'sem'])
+                                combinations.columns = ['n', 'Media', 'Desviación', 'Error estándar']
+                                
+                                st.dataframe(combinations, use_container_width=True)
+                                
+                                # Visualización
+                                st.markdown("### 📈 Visualización de Efectos")
+                                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+                                
+                                # Gráfico de interacción
+                                interaction_data = two_way_data.groupby([cat_var, cat_var2])[num_var].mean().unstack()
+                                interaction_data.plot(kind='line', marker='o', ax=ax1, linewidth=2, markersize=8)
+                                ax1.set_title(f'Gráfico de Interacción: {cat_var} × {cat_var2}', fontsize=14, fontweight='bold')
+                                ax1.set_xlabel(cat_var)
+                                ax1.set_ylabel(f'Media de {num_var}')
+                                ax1.legend(title=cat_var2)
+                                ax1.grid(True, alpha=0.3)
+                                
+                                # Heatmap de medias
+                                import seaborn as sns
+                                pivot_table = two_way_data.pivot_table(values=num_var, index=cat_var, columns=cat_var2, aggfunc='mean')
+                                sns.heatmap(pivot_table, annot=True, fmt=".2f", cmap='YlOrRd', ax=ax2)
+                                ax2.set_title(f'Heatmap de Medias por Combinación', fontsize=14, fontweight='bold')
+                                ax2.set_xlabel(cat_var2)
+                                ax2.set_ylabel(cat_var)
+                                
+                                plt.tight_layout()
+                                st.pyplot(fig)
+                                
+                                # Interpretación
+                                st.markdown("### 📝 Interpretación")
+                                
+                                interpretation_text = f"""
+                                **Análisis de Varianza de Dos Vías para {num_var}**
+                                
+                                **Efectos principales:**
+                                """
+                                
+                                if main_effect1_p is not None:
+                                    interpretation_text += f"\n- **{cat_var}:** {'Significativo' if main_effect1_p < alpha_anova else 'No significativo'} (p = {main_effect1_p:.4f})"
+                                
+                                if main_effect2_p is not None:
+                                    interpretation_text += f"\n- **{cat_var2}:** {'Significativo' if main_effect2_p < alpha_anova else 'No significativo'} (p = {main_effect2_p:.4f})"
+                                
+                                if interaction_p is not None:
+                                    interpretation_text += f"\n\n**Interacción {cat_var} × {cat_var2}:**"
+                                    interpretation_text += f"\n- {'Significativa' if interaction_p < alpha_anova else 'No significativa'} (p = {interaction_p:.4f})"
+                                    
+                                    if interaction_p < alpha_anova:
+                                        interpretation_text += f"\n- **IMPORTANTE:** La interacción significativa indica que el efecto de {cat_var} sobre {num_var} depende del nivel de {cat_var2} (y viceversa)."
+                                        interpretation_text += f"\n- Se debe interpretar la interacción antes que los efectos principales."
+                                
+                                st.info(interpretation_text)
+                                
+                                # Interpretación con OpenAI
+                                if openai_api_key and st.button("🤖 Obtener interpretación experta", 
+                                                              key="anova_twoway_ai", use_container_width=True):
+                                    with st.spinner("Consultando al experto..."):
+                                        prompt = f"""
+                                        Como experto en estadística, interpreta los siguientes resultados de ANOVA de dos vías:
+                                        
+                                        Variable dependiente: {num_var}
+                                        Variables independientes: {cat_var} y {cat_var2}
+                                        Nivel de significancia: {alpha_anova}
+                                        Número de observaciones: {len(two_way_data)}
+                                        
+                                        Resultados:
+                                        - Efecto principal de {cat_var}: p = {main_effect1_p:.4f} {'(Significativo)' if main_effect1_p < alpha_anova else '(No significativo)'}
+                                        - Efecto principal de {cat_var2}: p = {main_effect2_p:.4f} {'(Significativo)' if main_effect2_p < alpha_anova else '(No significativo)'}
+                                        - Interacción {cat_var} × {cat_var2}: p = {interaction_p:.4f} {'(Significativa)' if interaction_p < alpha_anova else '(No significativa)'}
+                                        
+                                        Tabla ANOVA completa:
+                                        {anova_table.to_string()}
+                                        
+                                        Estadísticas descriptivas por combinación:
+                                        {combinations.to_string()}
+                                        
+                                        Proporciona una interpretación detallada que incluya:
+                                        1. Explicación del ANOVA de dos vías y sus componentes
+                                        2. Interpretación de los efectos principales
+                                        3. Interpretación de la interacción (si es significativa)
+                                        4. Implicaciones prácticas de los resultados
+                                        5. Recomendaciones para análisis complementarios
+                                        6. Limitaciones y consideraciones importantes
+                                        7. Sugerencias para la presentación de resultados
+                                        
+                                        Sé claro, práctico y aplicable al contexto del análisis.
+                                        """
+                                        
+                                        interpretation = consultar_openai(prompt, max_tokens=2500)
+                                        st.markdown("---")
+                                        st.markdown("### 📚 Interpretación del Experto")
+                                        st.markdown(interpretation)
+                                        st.markdown("---")
+                                
+                                # Descargar resultados
+                                col_dl_twoway1, col_dl_twoway2 = st.columns(2)
+                                with col_dl_twoway1:
+                                    # Crear informe detallado
+                                    report_twoway = f"""
+                                    INFORME DE ANOVA DE DOS VÍAS
+                                    ==============================
+                                    
+                                    Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                                    Variable dependiente: {num_var}
+                                    Variables independientes: {cat_var} y {cat_var2}
+                                    
+                                    PARÁMETROS:
+                                    - Nivel de significancia (α): {alpha_anova}
+                                    - Número de observaciones: {len(two_way_data)}
+                                    
+                                    RESULTADOS ANOVA:
+                                    """
+                                    
+                                    for idx, row in anova_table.iterrows():
+                                        report_twoway += f"\n- {idx}:"
+                                        report_twoway += f"\n  * Suma de cuadrados: {row['sum_sq']:.4f}"
+                                        report_twoway += f"\n  * Grados de libertad: {row['df']:.0f}"
+                                        report_twoway += f"\n  * Cuadrado medio: {row['mean_sq']:.4f}"
+                                        report_twoway += f"\n  * Estadístico F: {row['F']:.4f}"
+                                        report_twoway += f"\n  * p-valor: {row['PR(>F)']:.4f}"
+                                    
+                                    report_twoway += f"""
+                                    
+                                    SIGNIFICANCIA:
+                                    - Efecto principal de {cat_var}: p = {main_effect1_p:.4f} ({'Significativo' if main_effect1_p < alpha_anova else 'No significativo'})
+                                    - Efecto principal de {cat_var2}: p = {main_effect2_p:.4f} ({'Significativo' if main_effect2_p < alpha_anova else 'No significativo'})
+                                    - Interacción {cat_var} × {cat_var2}: p = {interaction_p:.4f} ({'Significativa' if interaction_p < alpha_anova else 'No significativa'})
+                                    
+                                    ESTADÍSTICAS DESCRIPTIVAS POR COMBINACIÓN:
+                                    """
+                                    
+                                    for (cat1_val, cat2_val), row in combinations.iterrows():
+                                        report_twoway += f"\n- {cat_var} = {cat1_val}, {cat_var2} = {cat2_val}:"
+                                        report_twoway += f"\n  * n = {row['n']}"
+                                        report_twoway += f"\n  * Media = {row['Media']:.4f}"
+                                        report_twoway += f"\n  * Desviación = {row['Desviación']:.4f}"
+                                        report_twoway += f"\n  * Error estándar = {row['Error estándar']:.4f}"
+                                    
+                                    report_twoway += f"""
+                                    
+                                    INTERPRETACIÓN:
+                                    """
+                                    
+                                    if interaction_p < alpha_anova:
+                                        report_twoway += f"\n- La interacción significativa indica que el efecto de {cat_var} sobre {num_var} depende del nivel de {cat_var2}."
+                                        report_twoway += f"\n- Se debe analizar e interpretar la interacción antes que los efectos principales."
+                                    else:
+                                        report_twoway += f"\n- No hay interacción significativa entre {cat_var} y {cat_var2}."
+                                        if main_effect1_p < alpha_anova:
+                                            report_twoway += f"\n- {cat_var} tiene un efecto significativo sobre {num_var}."
+                                        if main_effect2_p < alpha_anova:
+                                            report_twoway += f"\n- {cat_var2} tiene un efecto significativo sobre {num_var}."
+                                    
+                                    report_twoway += f"""
+                                    
+                                    CONSIDERACIONES:
+                                    1. ANOVA de dos vías requiere normalidad de los residuos y homogeneidad de varianzas
+                                    2. Verificar supuestos antes de generalizar resultados
+                                    3. Con interacción significativa, los efectos principales deben interpretarse con cautela
+                                    4. Considerar análisis de efectos simples si hay interacción significativa
+                                    """
+                                    
+                                    st.download_button(
+                                        label="📥 Descargar informe",
+                                        data=report_twoway,
+                                        file_name=f"informe_anova_dos_vias_{num_var}_{cat_var}_{cat_var2}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                                        mime="text/plain",
+                                        use_container_width=True
+                                    )
+                                
+                                with col_dl_twoway2:
+                                    # Descargar datos
+                                    output_twoway = io.BytesIO()
+                                    with pd.ExcelWriter(output_twoway, engine='openpyxl') as writer:
+                                        # Datos completos
+                                        two_way_data.to_excel(writer, sheet_name='Datos', index=False)
+                                        
+                                        # Tabla ANOVA
+                                        anova_table.to_excel(writer, sheet_name='ANOVA')
+                                        
+                                        # Estadísticas descriptivas
+                                        combinations.to_excel(writer, sheet_name='Estadísticas')
+                                        
+                                        # Medias por combinación
+                                        pivot_table.to_excel(writer, sheet_name='Medias por Combinación')
+                                    
+                                    st.download_button(
+                                        label="📥 Descargar datos",
+                                        data=output_twoway.getvalue(),
+                                        file_name=f"datos_anova_dos_vias_{num_var}_{cat_var}_{cat_var2}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                        use_container_width=True
+                                    )
+                                
+                            except Exception as e:
+                                st.error(f"Error en ANOVA de dos vías: {e}")
+                                st.info("Asegúrate de tener suficientes datos para cada combinación de factores.")
                 
                 except Exception as e:
                     st.error(f"Error en ANOVA: {e}")
@@ -3743,8 +4002,739 @@ if df is not None:
             else:
                 st.warning(f"La variable '{mw_group}' tiene {len(unique_groups)} grupos. Debe tener exactamente 2 grupos.")
         
-        # Las otras pruebas no paramétricas seguirían un patrón similar...
-        # Por limitaciones de espacio, se muestran solo las principales
+        # Prueba de Wilcoxon (Pareada)
+        elif nonpar_test == "Wilcoxon (Pareada)" and len(numeric_cols) >= 2:
+            st.markdown("### 📊 Prueba de Wilcoxon (Muestras Pareadas)")
+            
+            col_wilcox1, col_wilcox2 = st.columns(2)
+            with col_wilcox1:
+                wilcox_before = st.selectbox("**Variable 'Antes':**", numeric_cols, key="wilcox_before_select")
+            
+            with col_wilcox2:
+                wilcox_after = st.selectbox("**Variable 'Después':**", numeric_cols, key="wilcox_after_select")
+            
+            if st.button("📊 Ejecutar Prueba de Wilcoxon", key="run_wilcoxon_full", use_container_width=True):
+                try:
+                    # Filtrar pares completos
+                    paired_data = df[[wilcox_before, wilcox_after]].dropna()
+                    
+                    if len(paired_data) < 3:
+                        st.error("Se necesitan al menos 3 pares completos de observaciones")
+                    else:
+                        # Ejecutar prueba de Wilcoxon
+                        w_stat, p_value = stats.wilcoxon(paired_data[wilcox_before], paired_data[wilcox_after])
+                        
+                        # Resultados principales
+                        st.markdown("### 📋 Resultados")
+                        
+                        col_res_wilcox1, col_res_wilcox2, col_res_wilcox3 = st.columns(3)
+                        with col_res_wilcox1:
+                            st.metric("Estadístico W", f"{w_stat:.4f}")
+                        with col_res_wilcox2:
+                            st.metric("p-valor", f"{p_value:.4f}")
+                        with col_res_wilcox3:
+                            is_significant = p_value < alpha_nonpar
+                            st.metric("Significativo", "✅ Sí" if is_significant else "❌ No")
+                        
+                        # Estadísticas descriptivas
+                        st.markdown("### 📊 Estadísticas Descriptivas")
+                        
+                        col_stats_wilcox1, col_stats_wilcox2 = st.columns(2)
+                        with col_stats_wilcox1:
+                            st.metric(f"Mediana '{wilcox_before}'", f"{paired_data[wilcox_before].median():.4f}")
+                            st.metric(f"Rango IQ '{wilcox_before}'", 
+                                    f"{paired_data[wilcox_before].quantile(0.75) - paired_data[wilcox_before].quantile(0.25):.4f}")
+                            st.metric(f"n pares", len(paired_data))
+                        
+                        with col_stats_wilcox2:
+                            st.metric(f"Mediana '{wilcox_after}'", f"{paired_data[wilcox_after].median():.4f}")
+                            st.metric(f"Rango IQ '{wilcox_after}'", 
+                                    f"{paired_data[wilcox_after].quantile(0.75) - paired_data[wilcox_after].quantile(0.25):.4f}")
+                        
+                        # Calcular diferencias
+                        differences = paired_data[wilcox_after] - paired_data[wilcox_before]
+                        st.metric("Diferencia de medianas", f"{paired_data[wilcox_after].median() - paired_data[wilcox_before].median():.4f}")
+                        
+                        # Interpretación
+                        st.info(f"""
+                        **📝 Interpretación:**
+                        - **Hipótesis nula (H₀):** Las distribuciones de {wilcox_before} y {wilcox_after} son iguales
+                        - **Hipótesis alternativa (H₁):** Las distribuciones de {wilcox_before} y {wilcox_after} son diferentes
+                        - **Decisión:** {'Se rechaza H₀' if is_significant else 'No se rechaza H₀'} (p = {p_value:.4f} {'<' if is_significant else '≥'} α = {alpha_nonpar})
+                        - {'Existen diferencias significativas' if is_significant else 'No existen diferencias significativas'} entre las distribuciones
+                        """)
+                        
+                        # Visualización
+                        st.markdown("### 📈 Visualización")
+                        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+                        
+                        # Boxplot comparativo
+                        plot_data = pd.DataFrame({
+                            'Momento': ['Antes'] * len(paired_data) + ['Después'] * len(paired_data),
+                            'Valor': list(paired_data[wilcox_before]) + list(paired_data[wilcox_after])
+                        })
+                        sns.boxplot(data=plot_data, x='Momento', y='Valor', ax=ax1, palette='Set2')
+                        ax1.set_title('Distribución Antes vs Después', fontsize=14, fontweight='bold')
+                        ax1.set_xlabel('Momento')
+                        ax1.set_ylabel('Valor')
+                        ax1.grid(True, alpha=0.3, axis='y')
+                        
+                        # Agregar medianas al gráfico
+                        for i, (name, data) in enumerate(zip(['Antes', 'Después'], [paired_data[wilcox_before], paired_data[wilcox_after]])):
+                            median_val = data.median()
+                            ax1.text(i, median_val, f'{median_val:.2f}', 
+                                   ha='center', va='bottom', fontweight='bold')
+                        
+                        # Gráfico de diferencias
+                        ax2.hist(differences, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
+                        ax2.axvline(0, color='red', linestyle='--', linewidth=2, alpha=0.7, label='Sin cambio')
+                        ax2.axvline(differences.median(), color='green', linestyle='-', linewidth=2.5, 
+                                  alpha=0.8, label=f'Mediana diferencias: {differences.median():.4f}')
+                        ax2.set_title('Distribución de las Diferencias', fontsize=14, fontweight='bold')
+                        ax2.set_xlabel('Diferencia (Después - Antes)')
+                        ax2.set_ylabel('Frecuencia')
+                        ax2.legend()
+                        ax2.grid(True, alpha=0.3)
+                        
+                        # Agregar estadísticas W al gráfico
+                        stats_text = f"W = {w_stat:.3f}\np = {p_value:.4f}\nn = {len(paired_data)}"
+                        ax2.text(0.02, 0.98, stats_text, transform=ax2.transAxes,
+                               fontsize=11, verticalalignment='top',
+                               bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+                        
+                        st.pyplot(fig)
+                        
+                        # Interpretación con OpenAI
+                        if openai_api_key and st.button("🤖 Obtener interpretación experta", 
+                                                      key="wilcoxon_ai", use_container_width=True):
+                            with st.spinner("Consultando al experto..."):
+                                prompt = f"""
+                                Como experto en estadística, interpreta los siguientes resultados de la prueba de Wilcoxon para muestras pareadas:
+                                
+                                Variables: {wilcox_before} (Antes) y {wilcox_after} (Después)
+                                Número de pares: {len(paired_data)}
+                                Nivel de significancia: {alpha_nonpar}
+                                
+                                Resultados:
+                                - Estadístico W: {w_stat:.4f}
+                                - p-valor: {p_value:.4f}
+                                - Significativo: {'Sí' if is_significant else 'No'}
+                                
+                                Estadísticas:
+                                - Mediana Antes: {paired_data[wilcox_before].median():.4f}
+                                - Mediana Después: {paired_data[wilcox_after].median():.4f}
+                                - Diferencia de medianas: {paired_data[wilcox_after].median() - paired_data[wilcox_before].median():.4f}
+                                - Rango intercuartílico Antes: {paired_data[wilcox_before].quantile(0.75) - paired_data[wilcox_before].quantile(0.25):.4f}
+                                - Rango intercuartílico Después: {paired_data[wilcox_after].quantile(0.75) - paired_data[wilcox_after].quantile(0.25):.4f}
+                                
+                                Hipótesis:
+                                - H₀: Las distribuciones de {wilcox_before} y {wilcox_after} son iguales
+                                - H₁: Las distribuciones de {wilcox_before} y {wilcox_after} son diferentes
+                                
+                                Proporciona una interpretación detallada que incluya:
+                                1. Explicación de la prueba de Wilcoxon para muestras pareadas
+                                2. Diferencias con la prueba T pareada
+                                3. Interpretación práctica de los resultados
+                                4. Implicaciones de la significancia estadística
+                                5. Análisis de las medianas y rangos intercuartílicos
+                                6. Recomendaciones para acciones basadas en los resultados
+                                7. Limitaciones y consideraciones importantes
+                                
+                                Sé claro, práctico y aplicable al contexto del análisis.
+                                """
+                                
+                                interpretation = consultar_openai(prompt, max_tokens=2500)
+                                st.markdown("---")
+                                st.markdown("### 📚 Interpretación del Experto")
+                                st.markdown(interpretation)
+                                st.markdown("---")
+                        
+                        # Descargar resultados
+                        col_dl_wilcox1, col_dl_wilcox2 = st.columns(2)
+                        with col_dl_wilcox1:
+                            # Crear informe detallado
+                            report_wilcox = f"""
+                            INFORME DE PRUEBA DE WILCOXON (MUESTRAS PAREADAS)
+                            ====================================================
+                            
+                            Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                            Variables: {wilcox_before} (Antes) y {wilcox_after} (Después)
+                            
+                            PARÁMETROS:
+                            - Nivel de significancia (α): {alpha_nonpar}
+                            - Prueba: Wilcoxon para muestras pareadas (no paramétrica)
+                            
+                            DATOS:
+                            - Número de pares: {len(paired_data)}
+                            - Mediana Antes: {paired_data[wilcox_before].median():.4f}
+                            - Mediana Después: {paired_data[wilcox_after].median():.4f}
+                            - Diferencia de medianas: {paired_data[wilcox_after].median() - paired_data[wilcox_before].median():.4f}
+                            - Rango intercuartílico Antes: {paired_data[wilcox_before].quantile(0.75) - paired_data[wilcox_before].quantile(0.25):.4f}
+                            - Rango intercuartílico Después: {paired_data[wilcox_after].quantile(0.75) - paired_data[wilcox_after].quantile(0.25):.4f}
+                            
+                            RESULTADOS:
+                            - Estadístico W: {w_stat:.4f}
+                            - p-valor: {p_value:.4f}
+                            - Significativo: {'Sí' if is_significant else 'No'}
+                            
+                            HIPÓTESIS:
+                            - H₀: Las distribuciones de {wilcox_before} y {wilcox_after} son iguales
+                            - H₁: Las distribuciones de {wilcox_before} y {wilcox_after} son diferentes
+                            
+                            DECISIÓN:
+                            - {'Se rechaza H₀' if is_significant else 'No se rechaza H₀'} (p = {p_value:.4f} {'<' if is_significant else '≥'} α = {alpha_nonpar})
+                            
+                            INTERPRETACIÓN:
+                            - {'Existen diferencias significativas' if is_significant else 'No existen diferencias significativas'} entre las distribuciones
+                            - Diferencia observada: {paired_data[wilcox_after].median() - paired_data[wilcox_before].median():.4f}
+                            
+                            CONSIDERACIONES:
+                            1. La prueba de Wilcoxon es la alternativa no paramétrica a la prueba T para muestras pareadas
+                            2. Evalúa diferencias en las distribuciones, no solo en las medias
+                            3. Es apropiada cuando las diferencias no son normales o tienen outliers
+                            4. Menos poderosa que la prueba T pareada cuando se cumplen los supuestos de normalidad
+                            """
+                            
+                            st.download_button(
+                                label="📥 Descargar informe",
+                                data=report_wilcox,
+                                file_name=f"informe_wilcoxon_{wilcox_before}_{wilcox_after}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
+                        
+                        with col_dl_wilcox2:
+                            # Descargar datos
+                            output_wilcox = io.BytesIO()
+                            with pd.ExcelWriter(output_wilcox, engine='openpyxl') as writer:
+                                # Datos
+                                paired_df = paired_data.copy()
+                                paired_df['Diferencia'] = differences
+                                paired_df['ID'] = range(1, len(paired_df) + 1)
+                                paired_df = paired_df[['ID', wilcox_before, wilcox_after, 'Diferencia']]
+                                paired_df.to_excel(writer, sheet_name='Datos', index=False)
+                                
+                                # Resultados
+                                results_df = pd.DataFrame({
+                                    'Métrica': ['Estadístico W', 'p-valor', 'Significativo',
+                                               'Mediana Antes', 'Mediana Después', 'Diferencia medianas'],
+                                    'Valor': [f"{w_stat:.4f}", f"{p_value:.4f}", 
+                                             'Sí' if is_significant else 'No',
+                                             f"{paired_data[wilcox_before].median():.4f}",
+                                             f"{paired_data[wilcox_after].median():.4f}",
+                                             f"{paired_data[wilcox_after].median() - paired_data[wilcox_before].median():.4f}"]
+                                })
+                                results_df.to_excel(writer, sheet_name='Resultados', index=False)
+                                
+                                # Estadísticas de diferencias
+                                diff_stats = pd.DataFrame({
+                                    'Estadística': ['Mediana', 'Rango_IQ', 'Mínimo', 'Máximo'],
+                                    'Valor': [differences.median(), 
+                                             differences.quantile(0.75) - differences.quantile(0.25),
+                                             differences.min(), differences.max()]
+                                })
+                                diff_stats.to_excel(writer, sheet_name='Diferencias', index=False)
+                            
+                            st.download_button(
+                                label="📥 Descargar datos",
+                                data=output_wilcox.getvalue(),
+                                file_name=f"datos_wilcoxon_{wilcox_before}_{wilcox_after}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True
+                            )
+                
+                except Exception as e:
+                    st.error(f"Error en prueba de Wilcoxon: {e}")
+        
+        # Prueba de Kruskal-Wallis
+        elif nonpar_test == "Kruskal-Wallis" and numeric_cols and categorical_cols:
+            st.markdown("### 📊 Prueba de Kruskal-Wallis")
+            
+            col_kw1, col_kw2 = st.columns(2)
+            with col_kw1:
+                kw_var = st.selectbox("**Variable numérica:**", numeric_cols, key="kw_var_select")
+            
+            with col_kw2:
+                kw_group = st.selectbox("**Variable categórica:**", 
+                                       categorical_cols, key="kw_group_select")
+            
+            if st.button("📊 Ejecutar Kruskal-Wallis", key="run_kruskal_full", use_container_width=True):
+                try:
+                    # Preparar datos por grupos
+                    groups_data = []
+                    group_names = []
+                    
+                    for group in df[kw_group].dropna().unique():
+                        group_data = df[df[kw_group] == group][kw_var].dropna()
+                        if len(group_data) >= 3:
+                            groups_data.append(group_data)
+                            group_names.append(str(group))
+                    
+                    if len(groups_data) < 2:
+                        st.error("Se necesitan al menos 2 grupos con datos válidos")
+                    else:
+                        # Ejecutar prueba de Kruskal-Wallis
+                        h_stat, p_value = stats.kruskal(*groups_data)
+                        
+                        # Resultados principales
+                        st.markdown("### 📋 Resultados")
+                        
+                        col_res_kw1, col_res_kw2, col_res_kw3 = st.columns(3)
+                        with col_res_kw1:
+                            st.metric("Estadístico H", f"{h_stat:.4f}")
+                        with col_res_kw2:
+                            st.metric("p-valor", f"{p_value:.4f}")
+                        with col_res_kw3:
+                            is_significant = p_value < alpha_nonpar
+                            st.metric("Significativo", "✅ Sí" if is_significant else "❌ No")
+                        
+                        # Estadísticas descriptivas por grupo
+                        st.markdown("### 📊 Estadísticas por Grupo")
+                        
+                        stats_data = []
+                        for name, data in zip(group_names, groups_data):
+                            stats_data.append({
+                                'Grupo': name,
+                                'n': len(data),
+                                'Mediana': f"{data.median():.4f}",
+                                'Rango IQ': f"{data.quantile(0.75) - data.quantile(0.25):.4f}",
+                                'Mínimo': f"{data.min():.4f}",
+                                'Máximo': f"{data.max():.4f}"
+                            })
+                        
+                        stats_df = pd.DataFrame(stats_data)
+                        st.dataframe(stats_df, use_container_width=True)
+                        
+                        # Interpretación
+                        st.info(f"""
+                        **📝 Interpretación:**
+                        - **Hipótesis nula (H₀):** Todas las distribuciones de los grupos son iguales
+                        - **Hipótesis alternativa (H₁):** Al menos una distribución es diferente
+                        - **Decisión:** {'Se rechaza H₀' if is_significant else 'No se rechaza H₀'} (p = {p_value:.4f} {'<' if is_significant else '≥'} α = {alpha_nonpar})
+                        - {'Existen diferencias significativas' if is_significant else 'No existen diferencias significativas'} entre los grupos
+                        """)
+                        
+                        # Visualización
+                        st.markdown("### 📈 Visualización")
+                        fig, ax = plt.subplots(figsize=(12, 8))
+                        
+                        # Boxplot comparativo
+                        plot_data = []
+                        for name, data in zip(group_names, groups_data):
+                            for value in data:
+                                plot_data.append({'Grupo': name, 'Valor': value})
+                        
+                        plot_df = pd.DataFrame(plot_data)
+                        sns.boxplot(data=plot_df, x='Grupo', y='Valor', ax=ax, palette='Set2')
+                        ax.set_title(f'Prueba de Kruskal-Wallis: {kw_var} por {kw_group}', 
+                                   fontsize=14, fontweight='bold')
+                        ax.set_xlabel(kw_group)
+                        ax.set_ylabel(kw_var)
+                        ax.tick_params(axis='x', rotation=45)
+                        ax.grid(True, alpha=0.3, axis='y')
+                        
+                        # Agregar medianas al gráfico
+                        for i, (name, data) in enumerate(zip(group_names, groups_data)):
+                            median_val = data.median()
+                            ax.text(i, median_val, f'{median_val:.2f}', 
+                                   ha='center', va='bottom', fontweight='bold')
+                        
+                        # Agregar estadísticas H al gráfico
+                        stats_text = f"H = {h_stat:.3f}\np = {p_value:.4f}\nn = {sum(len(g) for g in groups_data)}"
+                        ax.text(0.02, 0.98, stats_text, transform=ax.transAxes,
+                               fontsize=11, verticalalignment='top',
+                               bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+                        
+                        st.pyplot(fig)
+                        
+                        # Interpretación con OpenAI
+                        if openai_api_key and st.button("🤖 Obtener interpretación experta", 
+                                                      key="kruskal_ai", use_container_width=True):
+                            with st.spinner("Consultando al experto..."):
+                                prompt = f"""
+                                Como experto en estadística, interpreta los siguientes resultados de la prueba de Kruskal-Wallis:
+                                
+                                Variable: {kw_var}
+                                Variable de agrupación: {kw_group}
+                                Número de grupos: {len(groups_data)}
+                                Nivel de significancia: {alpha_nonpar}
+                                
+                                Resultados:
+                                - Estadístico H: {h_stat:.4f}
+                                - p-valor: {p_value:.4f}
+                                - Significativo: {'Sí' if is_significant else 'No'}
+                                
+                                Estadísticas por grupo:
+                                """
+                                
+                                for i, (name, data) in enumerate(zip(group_names, groups_data)):
+                                    prompt += f"\n- {name}: n = {len(data)}, Mediana = {data.median():.4f}, Rango IQ = {data.quantile(0.75) - data.quantile(0.25):.4f}"
+                                
+                                prompt += f"""
+                                
+                                Hipótesis:
+                                - H₀: Todas las distribuciones de los grupos son iguales
+                                - H₁: Al menos una distribución es diferente
+                                
+                                Proporciona una interpretación detallada que incluya:
+                                1. Explicación de la prueba de Kruskal-Wallis
+                                2. Diferencias con el ANOVA de una vía
+                                3. Interpretación práctica de los resultados
+                                4. Implicaciones de la significancia estadística
+                                5. Análisis de las medianas y rangos intercuartílicos por grupo
+                                6. Recomendaciones para análisis post-hoc si es significativo
+                                7. Limitaciones y consideraciones importantes
+                                
+                                Sé claro, práctico y aplicable al contexto del análisis.
+                                """
+                                
+                                interpretation = consultar_openai(prompt, max_tokens=2500)
+                                st.markdown("---")
+                                st.markdown("### 📚 Interpretación del Experto")
+                                st.markdown(interpretation)
+                                st.markdown("---")
+                        
+                        # Descargar resultados
+                        col_dl_kw1, col_dl_kw2 = st.columns(2)
+                        with col_dl_kw1:
+                            # Crear informe detallado
+                            report_kw = f"""
+                            INFORME DE PRUEBA DE KRUSKAL-WALLIS
+                            ======================================
+                            
+                            Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                            Variable: {kw_var}
+                            Variable de agrupación: {kw_group}
+                            
+                            PARÁMETROS:
+                            - Nivel de significancia (α): {alpha_nonpar}
+                            - Prueba: Kruskal-Wallis (no paramétrica)
+                            - Número de grupos: {len(groups_data)}
+                            
+                            DATOS POR GRUPO:
+                            """
+                            
+                            for i, row in stats_df.iterrows():
+                                report_kw += f"\n- {row['Grupo']}:"
+                                report_kw += f"\n  * n = {row['n']}"
+                                report_kw += f"\n  * Mediana = {row['Mediana']}"
+                                report_kw += f"\n  * Rango intercuartílico = {row['Rango IQ']}"
+                                report_kw += f"\n  * Mínimo = {row['Mínimo']}"
+                                report_kw += f"\n  * Máximo = {row['Máximo']}"
+                            
+                            report_kw += f"""
+                            
+                            RESULTADOS:
+                            - Estadístico H: {h_stat:.4f}
+                            - p-valor: {p_value:.4f}
+                            - Significativo: {'Sí' if is_significant else 'No'}
+                            
+                            HIPÓTESIS:
+                            - H₀: Todas las distribuciones de los grupos son iguales
+                            - H₁: Al menos una distribución es diferente
+                            
+                            DECISIÓN:
+                            - {'Se rechaza H₀' if is_significant else 'No se rechaza H₀'} (p = {p_value:.4f} {'<' if is_significant else '≥'} α = {alpha_nonpar})
+                            
+                            INTERPRETACIÓN:
+                            - {'Existen diferencias significativas' if is_significant else 'No existen diferencias significativas'} entre los grupos
+                            - La prueba evalúa diferencias en las distribuciones, no solo en las medias
+                            
+                            CONSIDERACIONES:
+                            1. La prueba de Kruskal-Wallis es la alternativa no paramétrica al ANOVA de una vía
+                            2. Evalúa diferencias en las distribuciones entre tres o más grupos independientes
+                            3. Es apropiada cuando los datos no son normales o tienen outliers
+                            4. Para comparaciones múltiples post-hoc, considerar pruebas como Dunn's test
+                            """
+                            
+                            st.download_button(
+                                label="📥 Descargar informe",
+                                data=report_kw,
+                                file_name=f"informe_kruskal_wallis_{kw_var}_{kw_group}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                                mime="text/plain",
+                                use_container_width=True
+                            )
+                        
+                        with col_dl_kw2:
+                            # Descargar datos
+                            output_kw = io.BytesIO()
+                            with pd.ExcelWriter(output_kw, engine='openpyxl') as writer:
+                                # Datos por grupo
+                                group_data_all = pd.DataFrame()
+                                for name, data in zip(group_names, groups_data):
+                                    temp_df = pd.DataFrame({name: data})
+                                    group_data_all = pd.concat([group_data_all, temp_df], axis=1)
+                                group_data_all.to_excel(writer, sheet_name='Datos por Grupo', index=False)
+                                
+                                # Resultados
+                                results_df = pd.DataFrame({
+                                    'Métrica': ['Estadístico H', 'p-valor', 'Significativo', 'Número de grupos'],
+                                    'Valor': [f"{h_stat:.4f}", f"{p_value:.4f}", 
+                                             'Sí' if is_significant else 'No', len(groups_data)]
+                                })
+                                results_df.to_excel(writer, sheet_name='Resultados', index=False)
+                                
+                                # Estadísticas por grupo
+                                stats_df.to_excel(writer, sheet_name='Estadísticas', index=False)
+                            
+                            st.download_button(
+                                label="📥 Descargar datos",
+                                data=output_kw.getvalue(),
+                                file_name=f"datos_kruskal_wallis_{kw_var}_{kw_group}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True
+                            )
+                
+                except Exception as e:
+                    st.error(f"Error en Kruskal-Wallis: {e}")
+        
+        # Prueba Chi-cuadrado
+        elif nonpar_test == "Chi-cuadrado" and len(categorical_cols) >= 2:
+            st.markdown("### 📊 Prueba Chi-cuadrado de Independencia")
+            
+            col_chi1, col_chi2 = st.columns(2)
+            with col_chi1:
+                chi_var1 = st.selectbox("**Variable categórica 1:**", categorical_cols, key="chi_var1_select")
+            
+            with col_chi2:
+                chi_var2 = st.selectbox("**Variable categórica 2:**", 
+                                       [c for c in categorical_cols if c != chi_var1], 
+                                       key="chi_var2_select")
+            
+            if st.button("📊 Ejecutar Chi-cuadrado", key="run_chisquare_full", use_container_width=True):
+                try:
+                    # Crear tabla de contingencia
+                    contingency_table = pd.crosstab(df[chi_var1], df[chi_var2])
+                    
+                    # Verificar que todas las celdas tengan frecuencia >= 5
+                    if (contingency_table < 5).sum().sum() > 0:
+                        st.warning("⚠️ Algunas celdas tienen frecuencia < 5. Considera agrupar categorías.")
+                    
+                    # Ejecutar prueba Chi-cuadrado
+                    chi2_stat, p_value, dof, expected = stats.chi2_contingency(contingency_table)
+                    
+                    # Resultados principales
+                    st.markdown("### 📋 Resultados")
+                    
+                    col_res_chi1, col_res_chi2, col_res_chi3, col_res_chi4 = st.columns(4)
+                    with col_res_chi1:
+                        st.metric("Estadístico χ²", f"{chi2_stat:.4f}")
+                    with col_res_chi2:
+                        st.metric("p-valor", f"{p_value:.4f}")
+                    with col_res_chi3:
+                        st.metric("Grados libertad", dof)
+                    with col_res_chi4:
+                        is_significant = p_value < alpha_nonpar
+                        st.metric("Significativo", "✅ Sí" if is_significant else "❌ No")
+                    
+                    # Mostrar tabla de contingencia
+                    st.markdown("### 📊 Tabla de Contingencia")
+                    st.dataframe(contingency_table, use_container_width=True)
+                    
+                    # Mostrar frecuencias esperadas
+                    st.markdown("### 📈 Frecuencias Esperadas (Bajo Independencia)")
+                    expected_df = pd.DataFrame(expected, 
+                                             index=contingency_table.index, 
+                                             columns=contingency_table.columns)
+                    st.dataframe(expected_df, use_container_width=True)
+                    
+                    # Calcular residuos estandarizados
+                    residuals = (contingency_table - expected) / np.sqrt(expected)
+                    st.markdown("### 🔍 Residuos Estandarizados")
+                    residuals_df = pd.DataFrame(residuals, 
+                                              index=contingency_table.index, 
+                                              columns=contingency_table.columns)
+                    st.dataframe(residuals_df.style.background_gradient(cmap='RdBu', vmin=-3, vmax=3), 
+                                use_container_width=True)
+                    
+                    # Interpretación
+                    st.info(f"""
+                    **📝 Interpretación:**
+                    - **Hipótesis nula (H₀):** {chi_var1} y {chi_var2} son independientes
+                    - **Hipótesis alternativa (H₁):** {chi_var1} y {chi_var2} están asociadas
+                    - **Decisión:** {'Se rechaza H₀' if is_significant else 'No se rechaza H₀'} (p = {p_value:.4f} {'<' if is_significant else '≥'} α = {alpha_nonpar})
+                    - {'Existe asociación significativa' if is_significant else 'No existe asociación significativa'} entre las variables
+                    
+                    **📊 Residuos estandarizados:**
+                    - Valores > |2| indican asociación significativa en esa celda
+                    - Positivos: Frecuencia observada > esperada
+                    - Negativos: Frecuencia observada < esperada
+                    """)
+                    
+                    # Visualización
+                    st.markdown("### 📈 Visualización")
+                    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+                    
+                    # Heatmap de la tabla de contingencia
+                    sns.heatmap(contingency_table, annot=True, fmt='d', cmap='YlOrRd', ax=ax1)
+                    ax1.set_title(f'Tabla de Contingencia: {chi_var1} × {chi_var2}', 
+                                fontsize=14, fontweight='bold')
+                    ax1.set_xlabel(chi_var2)
+                    ax1.set_ylabel(chi_var1)
+                    
+                    # Heatmap de residuos estandarizados
+                    sns.heatmap(residuals_df, annot=True, fmt='.2f', cmap='RdBu', center=0, 
+                              vmin=-3, vmax=3, ax=ax2)
+                    ax2.set_title(f'Residuos Estandarizados', fontsize=14, fontweight='bold')
+                    ax2.set_xlabel(chi_var2)
+                    ax2.set_ylabel(chi_var1)
+                    
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    
+                    # Interpretación con OpenAI
+                    if openai_api_key and st.button("🤖 Obtener interpretación experta", 
+                                                  key="chisquare_ai", use_container_width=True):
+                        with st.spinner("Consultando al experto..."):
+                            prompt = f"""
+                            Como experto en estadística, interpreta los siguientes resultados de la prueba Chi-cuadrado de independencia:
+                            
+                            Variables: {chi_var1} y {chi_var2}
+                            Nivel de significancia: {alpha_nonpar}
+                            
+                            Resultados:
+                            - Estadístico χ²: {chi2_stat:.4f}
+                            - p-valor: {p_value:.4f}
+                            - Grados de libertad: {dof}
+                            - Significativo: {'Sí' if is_significant else 'No'}
+                            
+                            Tabla de contingencia observada:
+                            {contingency_table.to_string()}
+                            
+                            Tabla de frecuencias esperadas (bajo independencia):
+                            {expected_df.to_string()}
+                            
+                            Residuos estandarizados:
+                            {residuals_df.to_string()}
+                            
+                            Hipótesis:
+                            - H₀: {chi_var1} y {chi_var2} son independientes
+                            - H₁: {chi_var1} y {chi_var2} están asociadas
+                            
+                            Proporciona una interpretación detallada que incluya:
+                            1. Explicación de la prueba Chi-cuadrado de independencia
+                            2. Interpretación práctica de los resultados
+                            3. Análisis de la tabla de contingencia
+                            4. Interpretación de los residuos estandarizados
+                            5. Implicaciones de la significancia estadística
+                            6. Recomendaciones para análisis complementarios
+                            7. Limitaciones y consideraciones importantes
+                            
+                            Sé claro, práctico y aplicable al contexto del análisis.
+                            """
+                            
+                            interpretation = consultar_openai(prompt, max_tokens=2500)
+                            st.markdown("---")
+                            st.markdown("### 📚 Interpretación del Experto")
+                            st.markdown(interpretation)
+                            st.markdown("---")
+                    
+                    # Descargar resultados
+                    col_dl_chi1, col_dl_chi2 = st.columns(2)
+                    with col_dl_chi1:
+                        # Crear informe detallado
+                        report_chi = f"""
+                        INFORME DE PRUEBA CHI-CUADRADO DE INDEPENDENCIA
+                        ================================================
+                        
+                        Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+                        Variables: {chi_var1} y {chi_var2}
+                        
+                        PARÁMETROS:
+                        - Nivel de significancia (α): {alpha_nonpar}
+                        - Prueba: Chi-cuadrado de independencia
+                        
+                        TABLA DE CONTINGENCIA OBSERVADA:
+                        """
+                        
+                        # Agregar tabla observada
+                        report_chi += f"\n{chi_var1} \\ {chi_var2}"
+                        for col in contingency_table.columns:
+                            report_chi += f"\t{col}"
+                        report_chi += "\tTotal"
+                        
+                        for idx, row in contingency_table.iterrows():
+                            report_chi += f"\n{idx}"
+                            for col in contingency_table.columns:
+                                report_chi += f"\t{row[col]}"
+                            report_chi += f"\t{row.sum()}"
+                        
+                        report_chi += f"\nTotal"
+                        for col in contingency_table.columns:
+                            report_chi += f"\t{contingency_table[col].sum()}"
+                        report_chi += f"\t{contingency_table.sum().sum()}"
+                        
+                        report_chi += f"""
+                        
+                        RESULTADOS:
+                        - Estadístico χ²: {chi2_stat:.4f}
+                        - p-valor: {p_value:.4f}
+                        - Grados de libertad: {dof}
+                        - Significativo: {'Sí' if is_significant else 'No'}
+                        
+                        HIPÓTESIS:
+                        - H₀: {chi_var1} y {chi_var2} son independientes
+                        - H₁: {chi_var1} y {chi_var2} están asociadas
+                        
+                        DECISIÓN:
+                        - {'Se rechaza H₀' if is_significant else 'No se rechaza H₀'} (p = {p_value:.4f} {'<' if is_significant else '≥'} α = {alpha_nonpar})
+                        
+                        INTERPRETACIÓN:
+                        - {'Existe asociación significativa' if is_significant else 'No existe asociación significativa'} entre {chi_var1} y {chi_var2}
+                        - La fuerza de la asociación puede medirse con coeficientes como Phi, Cramer's V o coeficiente de contingencia
+                        
+                        CONSIDERACIONES:
+                        1. La prueba requiere que todas las celdas tengan frecuencia esperada ≥ 5
+                        2. Para tablas 2x2 con frecuencias pequeñas, usar prueba exacta de Fisher
+                        3. Los residuos estandarizados > |2| indican asociación significativa en esa celda específica
+                        4. La prueba mide asociación, no causalidad
+                        """
+                        
+                        st.download_button(
+                            label="📥 Descargar informe",
+                            data=report_chi,
+                            file_name=f"informe_chicuadrado_{chi_var1}_{chi_var2}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                    
+                    with col_dl_chi2:
+                        # Descargar datos
+                        output_chi = io.BytesIO()
+                        with pd.ExcelWriter(output_chi, engine='openpyxl') as writer:
+                            # Datos originales
+                            chi_data = df[[chi_var1, chi_var2]].copy()
+                            chi_data['ID'] = range(1, len(chi_data) + 1)
+                            chi_data = chi_data[['ID', chi_var1, chi_var2]]
+                            chi_data.to_excel(writer, sheet_name='Datos', index=False)
+                            
+                            # Tabla de contingencia
+                            contingency_table.to_excel(writer, sheet_name='Tabla Observada')
+                            
+                            # Frecuencias esperadas
+                            expected_df.to_excel(writer, sheet_name='Frecuencias Esperadas')
+                            
+                            # Residuos estandarizados
+                            residuals_df.to_excel(writer, sheet_name='Residuos')
+                            
+                            # Resultados
+                            results_df = pd.DataFrame({
+                                'Métrica': ['Estadístico χ²', 'p-valor', 'Grados libertad', 'Significativo'],
+                                'Valor': [f"{chi2_stat:.4f}", f"{p_value:.4f}", dof, 
+                                         'Sí' if is_significant else 'No']
+                            })
+                            results_df.to_excel(writer, sheet_name='Resultados', index=False)
+                        
+                        st.download_button(
+                            label="📥 Descargar datos",
+                            data=output_chi.getvalue(),
+                            file_name=f"datos_chicuadrado_{chi_var1}_{chi_var2}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+                
+                except Exception as e:
+                    st.error(f"Error en prueba Chi-cuadrado: {e}")
     
     # ========================================================================
     # PESTAÑA 9: REPORTES
