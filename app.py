@@ -1854,6 +1854,7 @@ if df is not None:
         else:
             st.warning("Se necesitan variables numéricas y categóricas para realizar ANOVA")
 
+
     # ============================================================================
     # PESTAÑA 8: PRUEBAS NO PARAMÉTRICAS (CON MEJORAS COMPLETAS)
     # ============================================================================
@@ -2602,6 +2603,309 @@ if df is not None:
                     st.error(f"Error en Kruskal-Wallis: {e}")
         
         # ============================================================================
+        # WILCOXON PAREADA (IMPLEMENTACIÓN COMPLETA)
+        # ============================================================================
+        
+        elif nonpar_test == "Wilcoxon (Pareada)" and len(numeric_cols) >= 2:
+            st.markdown("#### 📊 Prueba de Wilcoxon para Muestras Pareadas")
+            
+            st.markdown("**Selecciona las dos variables relacionadas (mediciones antes/después, pre-test/post-test):**")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                wp_var1 = st.selectbox("Variable 1 (ej: pre-test):", numeric_cols, key="wp_var1")
+            with col2:
+                # Filtrar para evitar seleccionar la misma variable
+                remaining_vars = [v for v in numeric_cols if v != wp_var1]
+                wp_var2 = st.selectbox("Variable 2 (ej: post-test):", remaining_vars, key="wp_var2")
+            
+            # Opción de prueba direccional
+            st.markdown("---")
+            alternative_option = st.radio(
+                "Hipótesis alternativa:",
+                ["two-sided", "greater", "less"],
+                format_func=lambda x: {
+                    "two-sided": "Diferente (dos colas)",
+                    "greater": "Variable 2 > Variable 1 (una cola)",
+                    "less": "Variable 2 < Variable 1 (una cola)"
+                }[x],
+                key="wilcoxon_alternative"
+            )
+            
+            if st.button("📊 Ejecutar Wilcoxon Pareada", type="primary", use_container_width=True):
+                try:
+                    # Filtrar datos pareados (eliminar pares con valores faltantes)
+                    paired_data = df[[wp_var1, wp_var2]].dropna()
+                    
+                    if len(paired_data) < 6:
+                        st.error("Se necesitan al menos 6 pares completos de datos para la prueba")
+                    else:
+                        data1 = paired_data[wp_var1]
+                        data2 = paired_data[wp_var2]
+                        
+                        # Ejecutar prueba
+                        wilcoxon_result = stats.wilcoxon(data1, data2, alternative=alternative_option, zero_method='zsplit')
+                        w_stat = wilcoxon_result.statistic
+                        p_value = wilcoxon_result.pvalue
+                        
+                        # Calcular diferencias
+                        differences = data2 - data1
+                        median_diff = differences.median()
+                        mean_diff = differences.mean()
+                        
+                        # Calcular tamaño del efecto
+                        n_pairs = len(paired_data)
+                        z_stat = stats.norm.ppf(1 - p_value/2) if p_value < 1 else 0
+                        r_effect = z_stat / np.sqrt(n_pairs)
+                        
+                        # Resultados
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        with col_res1:
+                            st.metric("Estadístico W", f"{w_stat:.4f}")
+                            st.metric("Pares válidos", n_pairs)
+                        with col_res2:
+                            st.metric("p-valor", f"{p_value:.4f}")
+                            st.metric("Diferencia mediana", f"{median_diff:.4f}")
+                        with col_res3:
+                            st.metric("Diferencia media", f"{mean_diff:.4f}")
+                            st.metric("Tamaño efecto (r)", f"{abs(r_effect):.4f}")
+                        
+                        # Exportar resultados
+                        resultados_wp = pd.DataFrame({
+                            'Prueba': ['Wilcoxon Pareada'],
+                            'Variable_1': [wp_var1],
+                            'Variable_2': [wp_var2],
+                            'Tipo_prueba': [alternative_option],
+                            'Estadistico_W': [w_stat],
+                            'p_valor': [p_value],
+                            'Pares_validos': [n_pairs],
+                            'Diferencia_mediana': [median_diff],
+                            'Diferencia_media': [mean_diff],
+                            'Tamano_efecto_r': [abs(r_effect)],
+                            'Interpretacion_efecto': ['Pequeño' if abs(r_effect) < 0.3 else 'Mediano' if abs(r_effect) < 0.5 else 'Grande'],
+                            'Significativo': ['Sí' if p_value < alpha_nonpar else 'No']
+                        })
+                        
+                        st.dataframe(resultados_wp, use_container_width=True)
+                        
+                        csv_wp = resultados_wp.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📥 Descargar Resultados Wilcoxon Pareada (CSV)",
+                            data=csv_wp,
+                            file_name=f"wilcoxon_pareada_{wp_var1}_{wp_var2}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                        
+                        # Análisis detallado
+                        with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
+                            # Decisión estadística
+                            if p_value < alpha_nonpar:
+                                decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                decision_explanation = f"Existe diferencia significativa entre mediciones (p = {p_value:.4f} < α = {alpha_nonpar})"
+                            else:
+                                decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                decision_explanation = f"No hay evidencia de diferencia significativa (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
+                            
+                            st.markdown(f"""
+                            ### 🎯 **DECISIÓN ESTADÍSTICA**
+                            
+                            {decision_text}
+                            
+                            *{decision_explanation}*
+                            """)
+                            
+                            # Visualización de diferencias
+                            fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 5))
+                            
+                            # 1. Gráfico de líneas para pares
+                            for idx in range(min(20, n_pairs)):
+                                ax1.plot([1, 2], [data1.iloc[idx], data2.iloc[idx]], 
+                                    color='gray', alpha=0.3, linewidth=1)
+                            ax1.plot([1, 2], [data1.mean(), data2.mean()], 
+                                color='red', linewidth=3, marker='o', markersize=8, label='Promedio')
+                            ax1.set_xlabel('Medición')
+                            ax1.set_xticks([1, 2])
+                            ax1.set_xticklabels([wp_var1, wp_var2])
+                            ax1.set_ylabel('Valor')
+                            ax1.set_title('Cambios Individuales (primeros 20 pares)')
+                            ax1.legend()
+                            ax1.grid(True, alpha=0.3)
+                            
+                            # 2. Histograma de diferencias
+                            ax2.hist(differences, bins='auto', edgecolor='black', alpha=0.7)
+                            ax2.axvline(x=0, color='red', linestyle='--', label='Sin cambio')
+                            ax2.axvline(x=median_diff, color='blue', linestyle='-', 
+                                    label=f'Mediana: {median_diff:.2f}')
+                            ax2.set_xlabel(f'Diferencia ({wp_var2} - {wp_var1})')
+                            ax2.set_ylabel('Frecuencia')
+                            ax2.set_title('Distribución de Diferencias')
+                            ax2.legend()
+                            ax2.grid(True, alpha=0.3)
+                            
+                            # 3. Diagrama de caja comparativo
+                            comparison_data = pd.DataFrame({
+                                'Variable': [wp_var1]*n_pairs + [wp_var2]*n_pairs,
+                                'Valor': list(data1) + list(data2)
+                            })
+                            sns.boxplot(data=comparison_data, x='Variable', y='Valor', ax=ax3, palette='Set2')
+                            ax3.set_title('Comparación de Distribuciones')
+                            ax3.set_ylabel('Valor')
+                            ax3.grid(True, alpha=0.3)
+                            
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                            
+                except Exception as e:
+                    st.error(f"Error en Wilcoxon Pareada: {e}")
+        
+        # ============================================================================
+        # WILCOXON UNA MUESTRA (IMPLEMENTACIÓN COMPLETA)
+        # ============================================================================
+        
+        elif nonpar_test == "Wilcoxon (Una muestra)" and numeric_cols:
+            st.markdown("#### 📊 Prueba de Wilcoxon para Una Muestra")
+            
+            ws_var = st.selectbox("Variable numérica:", numeric_cols, key="ws_var")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                reference_value = st.number_input(
+                    "Valor de referencia (comparar mediana con):",
+                    value=0.0,
+                    format="%.4f",
+                    key="wilcoxon_reference"
+                )
+            
+            with col2:
+                alternative_option = st.radio(
+                    "Hipótesis alternativa:",
+                    ["two-sided", "greater", "less"],
+                    format_func=lambda x: {
+                        "two-sided": f"Diferente de {reference_value}",
+                        "greater": f"Mayor que {reference_value}",
+                        "less": f"Menor que {reference_value}"
+                    }[x],
+                    key="wilcoxon_onesample_alt"
+                )
+            
+            if st.button("📊 Ejecutar Wilcoxon Una Muestra", type="primary", use_container_width=True):
+                try:
+                    # Obtener datos
+                    sample_data = df[ws_var].dropna()
+                    
+                    if len(sample_data) < 6:
+                        st.error("Se necesitan al menos 6 observaciones para la prueba")
+                    else:
+                        # Ejecutar prueba
+                        wilcoxon_result = stats.wilcoxon(sample_data - reference_value, 
+                                                    alternative=alternative_option, 
+                                                    zero_method='zsplit')
+                        w_stat = wilcoxon_result.statistic
+                        p_value = wilcoxon_result.pvalue
+                        
+                        # Estadísticos descriptivos
+                        median_sample = sample_data.median()
+                        mean_sample = sample_data.mean()
+                        std_sample = sample_data.std()
+                        
+                        # Calcular tamaño del efecto
+                        n_sample = len(sample_data)
+                        z_stat = stats.norm.ppf(1 - p_value/2) if p_value < 1 else 0
+                        r_effect = z_stat / np.sqrt(n_sample)
+                        
+                        # Resultados
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        with col_res1:
+                            st.metric("Estadístico W", f"{w_stat:.4f}")
+                            st.metric("Tamaño muestra", n_sample)
+                        with col_res2:
+                            st.metric("p-valor", f"{p_value:.4f}")
+                            st.metric("Mediana muestra", f"{median_sample:.4f}")
+                        with col_res3:
+                            st.metric("Referencia", f"{reference_value:.4f}")
+                            st.metric("Diferencia", f"{median_sample - reference_value:.4f}")
+                        
+                        # Exportar resultados
+                        resultados_ws = pd.DataFrame({
+                            'Prueba': ['Wilcoxon Una Muestra'],
+                            'Variable': [ws_var],
+                            'Valor_referencia': [reference_value],
+                            'Tipo_prueba': [alternative_option],
+                            'Estadistico_W': [w_stat],
+                            'p_valor': [p_value],
+                            'N': [n_sample],
+                            'Mediana_muestra': [median_sample],
+                            'Media_muestra': [mean_sample],
+                            'Desviacion_estandar': [std_sample],
+                            'Diferencia_mediana_referencia': [median_sample - reference_value],
+                            'Tamano_efecto_r': [abs(r_effect)],
+                            'Interpretacion_efecto': ['Pequeño' if abs(r_effect) < 0.3 else 'Mediano' if abs(r_effect) < 0.5 else 'Grande'],
+                            'Significativo': ['Sí' if p_value < alpha_nonpar else 'No']
+                        })
+                        
+                        st.dataframe(resultados_ws, use_container_width=True)
+                        
+                        csv_ws = resultados_ws.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📥 Descargar Resultados Wilcoxon Una Muestra (CSV)",
+                            data=csv_ws,
+                            file_name=f"wilcoxon_una_muestra_{ws_var}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
+                        
+                        # Análisis detallado
+                        with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
+                            # Decisión estadística
+                            if p_value < alpha_nonpar:
+                                decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                decision_explanation = f"La mediana difiere significativamente de {reference_value} (p = {p_value:.4f} < α = {alpha_nonpar})"
+                            else:
+                                decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                decision_explanation = f"No hay evidencia de diferencia con {reference_value} (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
+                            
+                            st.markdown(f"""
+                            ### 🎯 **DECISIÓN ESTADÍSTICA**
+                            
+                            {decision_text}
+                            
+                            *{decision_explanation}*
+                            """)
+                            
+                            # Visualización
+                            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+                            
+                            # 1. Histograma con valor de referencia
+                            ax1.hist(sample_data, bins='auto', edgecolor='black', alpha=0.7)
+                            ax1.axvline(x=reference_value, color='red', linestyle='--', 
+                                    linewidth=3, label=f'Referencia: {reference_value}')
+                            ax1.axvline(x=median_sample, color='blue', linestyle='-', 
+                                    linewidth=2, label=f'Mediana: {median_sample:.2f}')
+                            ax1.set_xlabel(ws_var)
+                            ax1.set_ylabel('Frecuencia')
+                            ax1.set_title(f'Distribución de {ws_var}\nvs Valor de Referencia')
+                            ax1.legend()
+                            ax1.grid(True, alpha=0.3)
+                            
+                            # 2. Diagrama de caja con valor de referencia
+                            ax2.boxplot(sample_data, vert=False, patch_artist=True)
+                            ax2.axvline(x=reference_value, color='red', linestyle='--', 
+                                    linewidth=3, label=f'Referencia: {reference_value}')
+                            ax2.set_xlabel(ws_var)
+                            ax2.set_title('Diagrama de Caja')
+                            ax2.set_yticks([1])
+                            ax2.set_yticklabels([ws_var])
+                            ax2.legend()
+                            ax2.grid(True, alpha=0.3)
+                            
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                            
+                except Exception as e:
+                    st.error(f"Error en Wilcoxon Una Muestra: {e}")
+        
+        # ============================================================================
         # CHI-CUADRADO (IMPLEMENTACIÓN COMPLETA)
         # ============================================================================
         
@@ -2906,6 +3210,216 @@ if df is not None:
                                 
                     except Exception as e:
                         st.error(f"Error en Chi-cuadrado: {e}")
+        
+        # ============================================================================
+        # WELCH (VARIANZAS DESIGUALES) - IMPLEMENTACIÓN COMPLETA
+        # ============================================================================
+        
+        elif nonpar_test == "Welch (varianzas desiguales)" and numeric_cols and categorical_cols:
+            st.markdown("#### 📊 Prueba T de Welch (Varianzas Desiguales)")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                welch_var = st.selectbox("Variable numérica:", numeric_cols, key="welch_var")
+            with col2:
+                welch_group = st.selectbox("Variable categórica (debe tener 2 grupos):", categorical_cols, key="welch_group")
+            
+            unique_groups = df[welch_group].dropna().unique()
+            if len(unique_groups) == 2:
+                group1, group2 = unique_groups[:2]
+                
+                # Opción de prueba direccional
+                st.markdown("---")
+                alternative_option = st.radio(
+                    "Hipótesis alternativa:",
+                    ["two-sided", "greater", "less"],
+                    format_func=lambda x: {
+                        "two-sided": "Diferente (dos colas)",
+                        "greater": f"{group2} > {group1} (una cola)",
+                        "less": f"{group2} < {group1} (una cola)"
+                    }[x],
+                    key="welch_alternative"
+                )
+                
+                if st.button("📊 Ejecutar Prueba T de Welch", type="primary", use_container_width=True):
+                    try:
+                        data1 = df[df[welch_group] == group1][welch_var].dropna()
+                        data2 = df[df[welch_group] == group2][welch_var].dropna()
+                        
+                        if len(data1) < 2 or len(data2) < 2:
+                            st.error("Cada grupo necesita al menos 2 observaciones")
+                        else:
+                            # Ejecutar prueba de Levene para verificar varianzas desiguales
+                            levene_stat, levene_p = stats.levene(data1, data2)
+                            
+                            # Ejecutar prueba T de Welch
+                            welch_result = stats.ttest_ind(data1, data2, equal_var=False, alternative=alternative_option)
+                            t_stat = welch_result.statistic
+                            p_value = welch_result.pvalue
+                            df_welch = welch_result.df
+                            
+                            # Estadísticos descriptivos
+                            mean1, mean2 = data1.mean(), data2.mean()
+                            std1, std2 = data1.std(), data2.std()
+                            n1, n2 = len(data1), len(data2)
+                            
+                            # Calcular tamaño del efecto (d de Cohen)
+                            pooled_sd = np.sqrt(((n1-1)*std1**2 + (n2-1)*std2**2) / (n1 + n2 - 2))
+                            cohen_d = (mean1 - mean2) / pooled_sd if pooled_sd != 0 else 0
+                            
+                            # Resultados
+                            col_res1, col_res2, col_res3 = st.columns(3)
+                            with col_res1:
+                                st.metric("Estadístico t", f"{t_stat:.4f}")
+                                st.metric("Grados libertad", f"{df_welch:.1f}")
+                            with col_res2:
+                                st.metric("p-valor", f"{p_value:.4f}")
+                                st.metric("d de Cohen", f"{abs(cohen_d):.4f}")
+                            with col_res3:
+                                st.metric(f"Media {group1}", f"{mean1:.4f}")
+                                st.metric(f"Media {group2}", f"{mean2:.4f}")
+                            
+                            # Resultados prueba de Levene
+                            with st.expander("📊 **Prueba de Homogeneidad de Varianzas (Levene)**"):
+                                st.markdown(f"""
+                                **Estadístico Levene:** {levene_stat:.4f}
+                                **p-valor Levene:** {levene_p:.4f}
+                                
+                                **Interpretación:** {
+                                    f"Las varianzas son significativamente diferentes (p = {levene_p:.4f} < 0.05)" 
+                                    if levene_p < 0.05 
+                                    else f"No hay evidencia de diferencia en varianzas (p = {levene_p:.4f} ≥ 0.05)"
+                                }
+                                """)
+                            
+                            # Exportar resultados
+                            resultados_welch = pd.DataFrame({
+                                'Prueba': ['Prueba T de Welch'],
+                                'Variable': [welch_var],
+                                'Grupo1': [group1],
+                                'Grupo2': [group2],
+                                'Tipo_prueba': [alternative_option],
+                                'Estadistico_t': [t_stat],
+                                'p_valor': [p_value],
+                                'Grados_libertad': [df_welch],
+                                'Media_grupo1': [mean1],
+                                'Media_grupo2': [mean2],
+                                'Desviacion_grupo1': [std1],
+                                'Desviacion_grupo2': [std2],
+                                'N_grupo1': [n1],
+                                'N_grupo2': [n2],
+                                'Cohen_d': [abs(cohen_d)],
+                                'Interpretacion_efecto': ['Pequeño' if abs(cohen_d) < 0.2 else 'Mediano' if abs(cohen_d) < 0.8 else 'Grande'],
+                                'Levene_p': [levene_p],
+                                'Varianzas_iguales': ['No' if levene_p < 0.05 else 'Sí'],
+                                'Significativo': ['Sí' if p_value < alpha_nonpar else 'No']
+                            })
+                            
+                            st.dataframe(resultados_welch, use_container_width=True)
+                            
+                            csv_welch = resultados_welch.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                label="📥 Descargar Resultados Prueba T de Welch (CSV)",
+                                data=csv_welch,
+                                file_name=f"welch_test_{welch_var}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                use_container_width=True
+                            )
+                            
+                            # Análisis detallado
+                            with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
+                                # Decisión estadística
+                                if p_value < alpha_nonpar:
+                                    decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                    decision_explanation = f"Existe diferencia significativa entre medias (p = {p_value:.4f} < α = {alpha_nonpar})"
+                                else:
+                                    decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                    decision_explanation = f"No hay evidencia de diferencia significativa (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
+                                
+                                st.markdown(f"""
+                                ### 🎯 **DECISIÓN ESTADÍSTICA**
+                                
+                                {decision_text}
+                                
+                                *{decision_explanation}*
+                                """)
+                                
+                                # Interpretación del tamaño del efecto
+                                d_desc = ""
+                                if abs(cohen_d) < 0.2:
+                                    d_desc = "**muy pequeño** (|d| < 0.2)"
+                                    d_icon = "🔍"
+                                elif abs(cohen_d) < 0.5:
+                                    d_desc = "**pequeño** (0.2 ≤ |d| < 0.5)"
+                                    d_icon = "📏"
+                                elif abs(cohen_d) < 0.8:
+                                    d_desc = "**mediano** (0.5 ≤ |d| < 0.8)"
+                                    d_icon = "📐"
+                                else:
+                                    d_desc = "**grande** (|d| ≥ 0.8)"
+                                    d_icon = "📊"
+                                
+                                st.info(f"""
+                                {d_icon} **Tamaño del efecto (d de Cohen):** {abs(cohen_d):.4f}
+                                
+                                **Interpretación:** El efecto es {d_desc}.
+                                
+                                **Diferencia estandarizada:** La diferencia entre medias equivale a {abs(cohen_d):.2f} 
+                                desviaciones estándar.
+                                """)
+                                
+                                # Visualización
+                                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+                                
+                                # 1. Boxplot comparativo
+                                plot_data = pd.DataFrame({
+                                    'Grupo': [group1]*len(data1) + [group2]*len(data2),
+                                    'Valor': list(data1) + list(data2)
+                                })
+                                sns.boxplot(data=plot_data, x='Grupo', y='Valor', ax=ax1, palette='Set2')
+                                ax1.set_title(f'Comparación de {welch_var}\npor {welch_group}')
+                                ax1.set_ylabel(welch_var)
+                                
+                                # 2. Histogramas superpuestos
+                                ax2.hist(data1, bins='auto', alpha=0.5, label=group1, density=True)
+                                ax2.hist(data2, bins='auto', alpha=0.5, label=group2, density=True)
+                                ax2.axvline(x=mean1, color='blue', linestyle='--', label=f'Media {group1}: {mean1:.2f}')
+                                ax2.axvline(x=mean2, color='red', linestyle='--', label=f'Media {group2}: {mean2:.2f}')
+                                ax2.set_xlabel(welch_var)
+                                ax2.set_ylabel('Densidad')
+                                ax2.set_title('Distribución de Datos por Grupo')
+                                ax2.legend()
+                                ax2.grid(True, alpha=0.3)
+                                
+                                plt.tight_layout()
+                                st.pyplot(fig)
+                                
+                    except Exception as e:
+                        st.error(f"Error en Prueba T de Welch: {e}")
+            else:
+                st.warning(f"La variable '{welch_group}' debe tener exactamente 2 grupos. Tiene {len(unique_groups)} grupos.")
+        
+        # ============================================================================
+        # MENSAJE CUANDO NO HAY DATOS SUFICIENTES
+        # ============================================================================
+        
+        elif nonpar_test == "Mann-Whitney U" and (not numeric_cols or not categorical_cols):
+            st.info("ℹ️ Para ejecutar Mann-Whitney U, necesitas al menos una variable numérica y una variable categórica.")
+        
+        elif nonpar_test == "Kruskal-Wallis" and (not numeric_cols or not categorical_cols):
+            st.info("ℹ️ Para ejecutar Kruskal-Wallis, necesitas al menos una variable numérica y una variable categórica.")
+        
+        elif nonpar_test == "Wilcoxon (Pareada)" and len(numeric_cols) < 2:
+            st.info("ℹ️ Para ejecutar Wilcoxon Pareada, necesitas al menos dos variables numéricas.")
+        
+        elif nonpar_test == "Wilcoxon (Una muestra)" and not numeric_cols:
+            st.info("ℹ️ Para ejecutar Wilcoxon Una Muestra, necesitas al menos una variable numérica.")
+        
+        elif nonpar_test == "Chi-cuadrado" and len(categorical_cols) < 2:
+            st.info("ℹ️ Para ejecutar Chi-cuadrado, necesitas al menos dos variables categóricas.")
+        
+        elif nonpar_test == "Welch (varianzas desiguales)" and (not numeric_cols or not categorical_cols):
+            st.info("ℹ️ Para ejecutar Prueba T de Welch, necesitas al menos una variable numérica y una variable categórica.")
 
 # Mensaje final si no hay datos cargados
 else:
