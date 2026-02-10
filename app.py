@@ -623,7 +623,7 @@ if df is not None:
                                 if abs(corr_value) > 0.5:  # Mostrar solo correlaciones fuertes
                                     strong_corrs.append((corr_matrix.columns[i], corr_matrix.columns[j], corr_value))
                         
-                        if strong_correls:
+                        if strong_corrs:
                             report_content.append("Correlaciones fuertes encontradas (|r| > 0.5):")
                             for var1, var2, corr in strong_corrs:
                                 report_content.append(f"- {var1} ↔ {var2}: {corr:.4f}")
