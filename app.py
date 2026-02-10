@@ -12,60 +12,40 @@ import statsmodels.api as sm
 from statsmodels.formula.api import ols
 from ydata_profiling import ProfileReport
 import io
-import openai
+import google.generativeai as genai
 import os
 
 # Configuración de la página
 st.set_page_config(
-    page_title="Analytics Statistics Assistant",
+    page_title="People Analytics Statistics",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 # Título principal
-st.title("🤖 Analytics Statistics Assistant")
+st.title("🤖 People Analytics Stats Bot")
 st.markdown("""
-Esta aplicación te ayuda a realizar análisis estadísticos descriptivos e inferenciales para análisis de datos general.
-Carga tus datos y consulta a OpenAI qué análisis realizar, luego ejecuta las funciones disponibles.
+Esta aplicación te ayuda a realizar análisis estadísticos descriptivos e inferenciales para People Analytics.
+Carga tus datos y consulta a Gemini qué análisis realizar, luego ejecuta las funciones disponibles.
 """)
 
 # Sidebar para configuración
 st.sidebar.header("🔧 Configuración")
 
-# Configuración de OpenAI API
-st.sidebar.subheader("Configuración de OpenAI")
-openai_api_key = st.sidebar.text_input("Ingresa tu API Key de OpenAI:", type="password")
-openai_client = None
+# Configuración de Gemini API
+st.sidebar.subheader("Configuración de Gemini")
+gemini_api_key = st.sidebar.text_input("Ingresa tu API Key de Gemini:", type="password")
 
-if openai_api_key:
+if gemini_api_key:
     try:
-        openai_client = openai.OpenAI(api_key=openai_api_key)
-        st.sidebar.success("✅ OpenAI configurado correctamente")
+        genai.configure(api_key=gemini_api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        st.sidebar.success("✅ Gemini configurado correctamente")
     except Exception as e:
-        st.sidebar.error(f"Error configurando OpenAI: {e}")
+        st.sidebar.error(f"Error configurando Gemini: {e}")
 else:
-    st.sidebar.warning("⚠️ Ingresa tu API Key de OpenAI para usar las recomendaciones")
-
-# Función para consultar OpenAI
-def consultar_openai(prompt, max_tokens=2000, temperature=0.7, model="gpt-4"):
-    """Consulta a OpenAI GPT para obtener recomendaciones y explicaciones"""
-    try:
-        if not openai_client:
-            return "Error: Cliente OpenAI no configurado. Por favor, ingresa tu API Key en la barra lateral."
-        
-        response = openai_client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "Eres un experto en estadística aplicada y análisis de datos. Proporciona explicaciones claras, precisas y prácticas."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=max_tokens,
-            temperature=temperature
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        return f"Error al consultar OpenAI: {str(e)}"
+    st.sidebar.warning("⚠️ Ingresa tu API Key de Gemini para usar las recomendaciones")
 
 # ASISTENTE TEÓRICO EN ESTADÍSTICA (se muestra siempre, sin necesidad de datos)
 st.subheader("📚 Asistente Teórico en Estadística")
@@ -82,7 +62,7 @@ theory_question = st.text_area(
 )
 
 if st.button("Consultar teoría estadística", key="theory_consultation_main") and theory_question:
-    if openai_api_key:
+    if gemini_api_key:
         with st.spinner("El experto en estadística está analizando tu consulta..."):
             try:
                 # Preparar contexto para asesoría teórica
@@ -111,18 +91,18 @@ if st.button("Consultar teoría estadística", key="theory_consultation_main") a
                 Mantén un tono pedagógico pero preciso, adecuado para profesionales que necesitan aplicar estos conceptos en análisis de datos.
                 """
                 
-                theory_response = consultar_openai(theory_context)
+                theory_response = model.generate_content(theory_context)
                 st.success("📚 Respuesta del Experto en Estadística:")
                 
                 # Mejorar la presentación de la respuesta
                 st.markdown("---")
-                st.markdown(theory_response)
+                st.markdown(theory_response.text)
                 st.markdown("---")
                 
             except Exception as e:
                 st.error(f"Error en la consulta teórica: {e}")
     else:
-        st.error("🔑 Necesitas configurar tu API Key de OpenAI en la barra lateral para usar el asistente teórico")
+        st.error("🔑 Necesitas configurar tu API Key de Gemini en la barra lateral para usar el asistente teórico")
 
 # Información sobre el asistente teórico
 with st.expander("💡 ¿Qué puedo preguntar al asistente teórico?"):
@@ -262,7 +242,7 @@ if df is not None:
         else:
             st.warning("No se encontraron variables categóricas")
 
-    # Sección de consulta a OpenAI PARA DATOS ESPECÍFICOS (esta va después de cargar datos)
+    # Sección de consulta a Gemini PARA DATOS ESPECÍFICOS (esta va después de cargar datos)
     st.subheader("🤖 Asistente de Análisis para tus Datos")
     st.markdown("Consulta recomendaciones específicas basadas en los datos que has cargado.")
     
@@ -274,12 +254,12 @@ if df is not None:
     )
     
     if st.button("Obtener recomendaciones de análisis", key="business_recommendations_main") and user_question:
-        if openai_api_key:
-            with st.spinner("OpenAI está analizando tu caso y datos..."):
+        if gemini_api_key:
+            with st.spinner("Gemini está analizando tu caso y datos..."):
                 try:
-                    # Preparar contexto para OpenAI
+                    # Preparar contexto para Gemini
                     context = f"""
-                    Tengo un dataset de análisis de datos con {df.shape[0]} filas y {df.shape[1]} columnas.
+                    Tengo un dataset de People Analytics con {df.shape[0]} filas y {df.shape[1]} columnas.
                     Variables numéricas: {numeric_cols}
                     Variables categóricas: {categorical_cols}
                     
@@ -302,16 +282,16 @@ if df is not None:
                     3. Interpretación esperada
                     """
                     
-                    response = consultar_openai(context)
+                    response = model.generate_content(context)
                     st.success("🎯 Recomendaciones de Análisis para tus Datos:")
                     st.markdown("---")
-                    st.write(response)
+                    st.write(response.text)
                     st.markdown("---")
                     
                 except Exception as e:
-                    st.error(f"Error consultando a OpenAI: {e}")
+                    st.error(f"Error consultando a Gemini: {e}")
         else:
-            st.error("🔑 Necesitas configurar tu API Key de OpenAI en la barra lateral")
+            st.error("🔑 Necesitas configurar tu API Key de Gemini en la barra lateral")
 
 # Sección de análisis estadísticos
 if df is not None:
@@ -2909,5 +2889,5 @@ else:
 # Footer
 st.markdown("---")
 st.markdown(
-    "**Analytics Statistics Assistant** - Herramienta para análisis estadísticos generales"
+    "**People Analytics Assistant** - Herramienta para análisis estadísticos en gestión de personas"
 )
