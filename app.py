@@ -1853,29 +1853,287 @@ if df is not None:
         else:
             st.warning("Se necesitan variables numéricas y categóricas para realizar ANOVA")
 
-    with tab8:  # Pruebas no paramétricas
+    # ============================================================================
+    # PESTAÑA 8: PRUEBAS NO PARAMÉTRICAS (CON MEJORAS COMPLETAS)
+    # ============================================================================
+
+    with tab8:
         st.subheader("🔄 Pruebas No Paramétricas")
-        st.markdown("Alternativas a las pruebas paramétricas cuando no se cumplen los supuestos de normalidad.")
+        st.markdown("Alternativas a las pruebas paramétricas cuando no se cumplen los supuestos de normalidad o con datos ordinales.")
         
-        nonpar_test = st.radio(
-            "Selecciona la prueba no paramétrica:",
-            ["Mann-Whitney U", "Wilcoxon (Pareada)", "Wilcoxon (Una muestra)", "Kruskal-Wallis", "Chi-cuadrado", "Welch (varianzas desiguales)"],
-            key="nonpar_test_tab8"
+        # MEJORA 2: Selector con descripciones detalladas
+        nonpar_options = {
+            "Mann-Whitney U": "Compara 2 grupos independientes (no normales)",
+            "Kruskal-Wallis": "Compara 3+ grupos independientes (no normales)",
+            "Wilcoxon (Pareada)": "Compara mediciones antes/después (no normales)",
+            "Wilcoxon (Una muestra)": "Compara muestra con valor de referencia",
+            "Chi-cuadrado": "Analiza asociación entre variables categóricas",
+            "Welch (varianzas desiguales)": "Prueba T para varianzas diferentes"
+        }
+        
+        nonpar_test = st.selectbox(
+            "Selecciona la prueba:",
+            list(nonpar_options.keys()),
+            format_func=lambda x: f"{x} - {nonpar_options[x]}",
+            key="nonpar_select"
         )
         
-        alpha_nonpar = st.slider("Nivel de significancia (α):", 0.01, 0.10, 0.05, key="nonpar_alpha_tab8")
+        alpha_nonpar = st.slider("Nivel de significancia (α):", 0.01, 0.10, 0.05, key="alpha_nonpar")
+        
+        # ============================================================================
+        # SECCIÓN DE EXPLICACIÓN PARA CADA PRUEBA (MEJORA 2)
+        # ============================================================================
+        
+        with st.expander("📚 **Explicación Teórica de la Prueba**", expanded=True):
+            if nonpar_test == "Mann-Whitney U":
+                st.markdown("""
+                ### **Prueba de Mann-Whitney U (Wilcoxon rank-sum test)**
+                
+                **📖 ¿Qué es?**
+                - Prueba no paramétrica para comparar dos grupos independientes
+                - No asume distribución normal de los datos
+                - Basada en rangos (ordena todos los datos y compara sumas de rangos)
+                
+                **🎯 ¿Cuándo usarla?**
+                1. Cuando tienes 2 grupos independientes
+                2. Los datos no siguen distribución normal (Shapiro-Wilk p < 0.05)
+                3. Las muestras son pequeñas (< 30 observaciones)
+                4. Los datos son ordinales o de intervalo
+                5. Las varianzas no son homogéneas
+                
+                **📊 Hipótesis:**
+                - **H₀ (Nula):** Las distribuciones de ambos grupos son iguales
+                - **H₁ (Alternativa):** Las distribuciones son diferentes
+                
+                **⚙️ Cálculo:**
+                1. Combina todos los datos de ambos grupos
+                2. Ordena de menor a mayor y asigna rangos
+                3. Calcula la suma de rangos para cada grupo (R₁, R₂)
+                4. Calcula estadístico U: U = min(U₁, U₂) donde Uᵢ = n₁n₂ + [nᵢ(nᵢ+1)/2] - Rᵢ
+                
+                **📈 Interpretación:**
+                - **U pequeño:** Muchos rangos bajos en un grupo → diferencia significativa
+                - **p < α:** Rechazar H₀ → hay diferencia entre grupos
+                - **p ≥ α:** No rechazar H₀ → no hay evidencia de diferencia
+                
+                **💡 Consideraciones:**
+                - Más robusta a outliers que la prueba T
+                - Menos potencia que la prueba T cuando los datos son normales
+                - Adecuada para datos ordinales
+                - Para muestras grandes (n > 20), se aproxima a distribución normal
+                """)
+                
+            elif nonpar_test == "Kruskal-Wallis":
+                st.markdown("""
+                ### **Prueba de Kruskal-Wallis**
+                
+                **📖 ¿Qué es?**
+                - Prueba no paramétrica para comparar tres o más grupos independientes
+                - Extensión de Mann-Whitney U para k > 2 grupos
+                - Equivalente no paramétrico del ANOVA de una vía
+                
+                **🎯 ¿Cuándo usarla?**
+                1. Cuando tienes 3 o más grupos independientes
+                2. Los datos no son normales
+                3. Los datos son ordinales
+                4. Las varianzas no son homogéneas
+                5. Tamaños de muestra desiguales
+                
+                **📊 Hipótesis:**
+                - **H₀ (Nula):** Las distribuciones de todos los grupos son iguales
+                - **H₁ (Alternativa):** Al menos un grupo tiene distribución diferente
+                
+                **⚙️ Cálculo:**
+                1. Combina todos los datos de todos los grupos
+                2. Ordena y asigna rangos (promedia rangos para empates)
+                3. Calcula suma de rangos para cada grupo (Rᵢ)
+                4. Calcula estadístico H: H = [12/N(N+1)] * Σ(Rᵢ²/nᵢ) - 3(N+1)
+                
+                **📈 Interpretación:**
+                - **H grande:** Diferencias grandes entre sumas de rangos → probable diferencia
+                - **p < α:** Rechazar H₀ → al menos un grupo es diferente
+                - **p ≥ α:** No rechazar H₀ → no hay evidencia de diferencias
+                
+                **💡 Consideraciones:**
+                - Si es significativa, necesita pruebas post-hoc (Dunn, Conover-Iman)
+                - Para muestras pequeñas, usar tablas exactas de Kruskal-Wallis
+                - Para muchos empates, necesita corrección
+                - No indica qué grupos difieren (solo que hay diferencia)
+                """)
+                
+            elif nonpar_test == "Wilcoxon (Pareada)":
+                st.markdown("""
+                ### **Prueba de Wilcoxon para muestras pareadas**
+                
+                **📖 ¿Qué es?**
+                - Prueba no paramétrica para comparar dos mediciones relacionadas
+                - Para datos pareados (mismos sujetos en dos condiciones)
+                - Alternativa a la prueba T pareada cuando no hay normalidad
+                
+                **🎯 ¿Cuándo usarla?**
+                1. Diseños antes-después (pre-test/post-test)
+                2. Comparación de dos tratamientos en mismos sujetos
+                3. Mediciones repetidas en el tiempo
+                4. Cuando las diferencias no son normales
+                5. Con datos ordinales
+                
+                **📊 Hipótesis:**
+                - **H₀ (Nula):** La mediana de las diferencias es cero
+                - **H₁ (Alternativa):** La mediana de las diferencias no es cero
+                
+                **⚙️ Cálculo:**
+                1. Calcula diferencias para cada par (dᵢ = postᵢ - preᵢ)
+                2. Ordena valores absolutos de diferencias y asigna rangos
+                3. Separa rangos por signo (positivos vs negativos)
+                4. Calcula W⁺ (suma rangos positivos) y W⁻ (suma rangos negativos)
+                5. W = min(W⁺, W⁻)
+                
+                **📈 Interpretación:**
+                - **W pequeño:** Una dirección domina → diferencia significativa
+                - **p < α:** Rechazar H₀ → hay diferencia entre mediciones
+                - **p ≥ α:** No rechazar H₀ → no hay evidencia de diferencia
+                
+                **💡 Consideraciones:**
+                - Más potente que la prueba de signos
+                - Para n > 25, se aproxima a distribución normal
+                - Necesita al menos 6 pares para ser confiable
+                - Considerar tamaño del efecto (r = Z/√n)
+                """)
+                
+            elif nonpar_test == "Wilcoxon (Una muestra)":
+                st.markdown("""
+                ### **Prueba de Wilcoxon para una muestra**
+                
+                **📖 ¿Qué es?**
+                - Prueba no paramétrica para comparar una muestra con valor teórico
+                - Alternativa a la prueba T para una muestra cuando no hay normalidad
+                - Evalúa si la mediana muestral difiere de un valor de referencia
+                
+                **🎯 ¿Cuándo usarla?**
+                1. Para comparar una muestra con valor poblacional conocido
+                2. Cuando los datos no son normales
+                3. Con muestras pequeñas
+                4. Para datos ordinales
+                5. Cuando hay outliers que afectan la media
+                
+                **📊 Hipótesis:**
+                - **H₀ (Nula):** La mediana poblacional es igual al valor de referencia
+                - **H₁ (Alternativa):** La mediana poblacional es diferente del valor de referencia
+                
+                **⚙️ Cálculo:**
+                1. Calcula diferencias entre cada observación y valor de referencia
+                2. Ordena valores absolutos de diferencias y asigna rangos
+                3. Ignora diferencias iguales a cero
+                4. Separa rangos por signo
+                5. Calcula estadístico W = menor suma de rangos por signo
+                
+                **📈 Interpretación:**
+                - **W pequeño:** Muchas diferencias en una dirección → diferencia significativa
+                - **p < α:** Rechazar H₀ → mediana diferente del valor de referencia
+                - **p ≥ α:** No rechazar H₀ → no hay evidencia de diferencia
+                
+                **💡 Consideraciones:**
+                - Más robusta a outliers que la prueba T
+                - Para n > 15, usar aproximación normal
+                - Reportar mediana e intervalo de confianza para mediana
+                - Considerar pruebas de signo como alternativa más simple
+                """)
+                
+            elif nonpar_test == "Chi-cuadrado":
+                st.markdown("""
+                ### **Prueba de Chi-cuadrado de independencia**
+                
+                **📖 ¿Qué es?**
+                - Prueba para evaluar asociación entre dos variables categóricas
+                - Compara frecuencias observadas vs frecuencias esperadas bajo independencia
+                - Para tablas de contingencia r x c
+                
+                **🎯 ¿Cuándo usarla?**
+                1. Ambas variables son categóricas
+                2. Las observaciones son independientes
+                3. Para tablas 2x2, 2x3, rxc
+                4. Para pruebas de bondad de ajuste
+                5. Para pruebas de homogeneidad
+                
+                **📊 Hipótesis:**
+                - **H₀ (Nula):** Las variables son independientes (no hay asociación)
+                - **H₁ (Alternativa):** Las variables no son independientes (hay asociación)
+                
+                **⚙️ Cálculo:**
+                1. Crea tabla de contingencia con frecuencias observadas (Oᵢⱼ)
+                2. Calcula frecuencias esperadas (Eᵢⱼ = (filaᵢ total × colⱼ total) / N total)
+                3. Calcula χ² = Σ[(Oᵢⱼ - Eᵢⱼ)² / Eᵢⱼ]
+                4. Grados de libertad = (filas-1) × (columnas-1)
+                
+                **📈 Interpretación:**
+                - **χ² grande:** Grandes discrepancias O vs E → probable asociación
+                - **p < α:** Rechazar H₀ → hay asociación significativa
+                - **p ≥ α:** No rechazar H₀ → no hay evidencia de asociación
+                
+                **💡 Consideraciones:**
+                - **Supuesto crítico:** Frecuencias esperadas ≥ 5 en ≥80% celdas
+                - Para tablas 2x2 con n < 20, usar Fisher exact test
+                - Para ordinales, considerar pruebas más potentes
+                - Medidas de efecto: V de Cramer, φ (phi), odds ratio
+                - Examinar residuos estandarizados para patrones
+                """)
+                
+            elif nonpar_test == "Welch (varianzas desiguales)":
+                st.markdown("""
+                ### **Prueba T de Welch**
+                
+                **📖 ¿Qué es?**
+                - Prueba paramétrica para comparar dos medias con varianzas desiguales
+                - Modificación de la prueba T de Student que no asume varianzas iguales
+                - Más robusta cuando se viola el supuesto de homocedasticidad
+                
+                **🎯 ¿Cuándo usarla?**
+                1. Cuando tienes 2 grupos independientes
+                2. Las varianzas son significativamente diferentes (Levene p < 0.05)
+                3. Los tamaños de muestra son muy diferentes
+                4. Los datos son aproximadamente normales
+                5. Cuando la prueba T estándar no es apropiada
+                
+                **📊 Hipótesis:**
+                - **H₀ (Nula):** Las medias poblacionales son iguales (μ₁ = μ₂)
+                - **H₁ (Alternativa):** Las medias poblacionales son diferentes (μ₁ ≠ μ₂)
+                
+                **⚙️ Cálculo:**
+                1. Calcula medias y varianzas de cada grupo
+                2. Estadístico t = (x̄₁ - x̄₂) / √(s₁²/n₁ + s₂²/n₂)
+                3. Grados libertad ajustados: df = (s₁²/n₁ + s₂²/n₂)² / [(s₁²/n₁)²/(n₁-1) + (s₂²/n₂)²/(n₂-1)]
+                
+                **📈 Interpretación:**
+                - **|t| grande:** Diferencia grande relativa a error estándar → probable diferencia
+                - **p < α:** Rechazar H₀ → medias significativamente diferentes
+                - **p ≥ α:** No rechazar H₀ → no hay evidencia de diferencia
+                
+                **💡 Consideraciones:**
+                - Menos potencia que la prueba T estándar cuando varianzas son iguales
+                - Más conservadora y robusta
+                - Adecuada para diseños con n desiguales
+                - Siempre reportar prueba de Levene primero
+                - Considerar transformaciones si hay falta de normalidad severa
+                """)
+        
+        # ============================================================================
+        # MANN-WHITNEY U (IMPLEMENTACIÓN COMPLETA)
+        # ============================================================================
         
         if nonpar_test == "Mann-Whitney U" and numeric_cols and categorical_cols:
-            st.subheader("Prueba de Mann-Whitney U")
+            st.markdown("#### 📊 Prueba de Mann-Whitney U")
             
-            mw_var = st.selectbox("Variable numérica:", numeric_cols, key="mw_var_tab8")
-            mw_group = st.selectbox("Variable categórica (debe tener 2 grupos):", categorical_cols, key="mw_group_tab8")
+            col1, col2 = st.columns(2)
+            with col1:
+                mw_var = st.selectbox("Variable numérica:", numeric_cols, key="mw_var")
+            with col2:
+                mw_group = st.selectbox("Variable categórica (debe tener 2 grupos):", categorical_cols, key="mw_group")
             
             unique_groups = df[mw_group].dropna().unique()
             if len(unique_groups) == 2:
-                group1, group2 = unique_groups
+                group1, group2 = unique_groups[:2]
                 
-                if st.button("📊 Ejecutar Mann-Whitney U", key="mw_button_tab8"):
+                if st.button("📊 Ejecutar Mann-Whitney U", type="primary", use_container_width=True):
                     try:
                         data1 = df[df[mw_group] == group1][mw_var].dropna()
                         data2 = df[df[mw_group] == group2][mw_var].dropna()
@@ -1883,351 +2141,770 @@ if df is not None:
                         if len(data1) < 3 or len(data2) < 3:
                             st.error("Cada grupo necesita al menos 3 observaciones")
                         else:
+                            # Ejecutar prueba
                             u_stat, p_value = stats.mannwhitneyu(data1, data2, alternative='two-sided')
                             
-                            st.subheader("📋 Resultados")
-                            col1, col2 = st.columns(2)
-                            with col1:
+                            # Calcular tamaño del efecto (r de Rosenthal)
+                            n1, n2 = len(data1), len(data2)
+                            z_stat = stats.norm.ppf(1 - p_value/2) if p_value < 1 else 0
+                            r_effect = z_stat / np.sqrt(n1 + n2)
+                            
+                            # Resultados en métricas
+                            col_res1, col_res2, col_res3 = st.columns(3)
+                            with col_res1:
                                 st.metric("Estadístico U", f"{u_stat:.4f}")
-                            with col2:
+                                st.metric("Tamaño efecto (r)", f"{abs(r_effect):.4f}")
+                            with col_res2:
                                 st.metric("p-valor", f"{p_value:.4f}")
-                            
-                            col1, col2 = st.columns(2)
-                            with col1:
+                                st.metric(f"N {group1}", len(data1))
+                            with col_res3:
                                 st.metric(f"Mediana {group1}", f"{data1.median():.4f}")
-                                st.metric(f"Rango intercuartílico {group1}", f"{data1.quantile(0.75) - data1.quantile(0.25):.4f}")
-                                st.metric(f"Tamaño {group1}", len(data1))
-                            with col2:
                                 st.metric(f"Mediana {group2}", f"{data2.median():.4f}")
-                                st.metric(f"Rango intercuartílico {group2}", f"{data2.quantile(0.75) - data2.quantile(0.25):.4f}")
-                                st.metric(f"Tamaño {group2}", len(data2))
                             
-                            if p_value < alpha_nonpar:
-                                st.success(f"✅ **Se rechaza la hipótesis nula** (p = {p_value:.4f} < α = {alpha_nonpar})")
-                            else:
-                                st.warning(f"✅ **No se rechaza la hipótesis nula** (p = {p_value:.4f} ≥ α = {alpha_nonpar})")
-                            
-                            # Visualización
-                            st.subheader("📊 Comparación Visual")
-                            fig, ax = plt.subplots(figsize=(10, 6))
-                            plot_data = pd.DataFrame({
-                                'Grupo': [group1] * len(data1) + [group2] * len(data2),
-                                'Valor': list(data1) + list(data2)
+                            # MEJORA 1: Exportar resultados CSV
+                            resultados_mw = pd.DataFrame({
+                                'Prueba': ['Mann-Whitney U'],
+                                'Variable': [mw_var],
+                                'Grupo1': [group1],
+                                'Grupo2': [group2],
+                                'Estadistico_U': [u_stat],
+                                'p_valor': [p_value],
+                                'Significativo': ['Sí' if p_value < alpha_nonpar else 'No'],
+                                'Mediana_grupo1': [data1.median()],
+                                'Mediana_grupo2': [data2.median()],
+                                'N_grupo1': [len(data1)],
+                                'N_grupo2': [len(data2)],
+                                'Tamano_efecto_r': [abs(r_effect)],
+                                'Interpretacion_efecto': ['Pequeño' if abs(r_effect) < 0.3 else 'Mediano' if abs(r_effect) < 0.5 else 'Grande']
                             })
-                            sns.boxplot(data=plot_data, x='Grupo', y='Valor', ax=ax)
-                            ax.set_title(f'Comparación de {mw_var} entre {group1} y {group2}\n(Prueba U de Mann-Whitney)')
-                            st.pyplot(fig)
+                            
+                            st.dataframe(resultados_mw, use_container_width=True)
+                            
+                            csv_mw = resultados_mw.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                label="📥 Descargar Resultados Mann-Whitney U (CSV)",
+                                data=csv_mw,
+                                file_name=f"mannwhitney_{mw_var}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                use_container_width=True
+                            )
+                            
+                            # MEJORA 2: SECCIÓN DE ANÁLISIS Y CONCLUSIONES
+                            with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
+                                
+                                # Decisión estadística
+                                if p_value < alpha_nonpar:
+                                    decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                    decision_explanation = f"El p-valor ({p_value:.4f}) es menor que el nivel de significancia α ({alpha_nonpar})"
+                                    color = "success"
+                                else:
+                                    decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                    decision_explanation = f"El p-valor ({p_value:.4f}) es mayor o igual que el nivel de significancia α ({alpha_nonpar})"
+                                    color = "warning"
+                                
+                                st.markdown(f"""
+                                ### 🎯 **DECISIÓN ESTADÍSTICA**
+                                
+                                {decision_text}
+                                
+                                *{decision_explanation}*
+                                """)
+                                
+                                # Interpretación sustantiva
+                                st.markdown("""
+                                ### 📈 **INTERPRETACIÓN SUSTANTIVA**
+                                """)
+                                
+                                if p_value < alpha_nonpar:
+                                    st.success(f"""
+                                    **Hay evidencia estadísticamente significativa** de que las distribuciones de '{group1}' 
+                                    y '{group2}' son diferentes en la variable '{mw_var}'.
                                     
+                                    **La diferencia observada** entre las medianas ({data1.median():.2f} vs {data2.median():.2f}) 
+                                    **NO parece deberse al azar** con un nivel de confianza del {(1-alpha_nonpar)*100:.0f}%.
+                                    """)
+                                else:
+                                    st.warning(f"""
+                                    **NO hay evidencia estadísticamente significativa** de diferencia entre las distribuciones 
+                                    de '{group1}' y '{group2}' en la variable '{mw_var}'.
+                                    
+                                    **La diferencia observada** entre las medianas ({data1.median():.2f} vs {data2.median():.2f}) 
+                                    **PODRÍA deberse al azar** o variación muestral.
+                                    """)
+                                
+                                # Tamaño del efecto y relevancia práctica
+                                st.markdown("""
+                                ### 📏 **TAMAÑO DEL EFECTO Y RELEVANCIA PRÁCTICA**
+                                """)
+                                
+                                effect_size_desc = ""
+                                if abs(r_effect) < 0.1:
+                                    effect_size_desc = "**muy pequeño** (r < 0.1)"
+                                    effect_icon = "🔍"
+                                elif abs(r_effect) < 0.3:
+                                    effect_size_desc = "**pequeño** (0.1 ≤ r < 0.3)"
+                                    effect_icon = "📏"
+                                elif abs(r_effect) < 0.5:
+                                    effect_size_desc = "**mediano** (0.3 ≤ r < 0.5)"
+                                    effect_icon = "📐"
+                                else:
+                                    effect_size_desc = "**grande** (r ≥ 0.5)"
+                                    effect_icon = "📊"
+                                
+                                st.info(f"""
+                                {effect_icon} **Tamaño del efecto (r de Rosenthal):** {abs(r_effect):.4f}
+                                
+                                **Interpretación:** El efecto es {effect_size_desc}.
+                                
+                                **Relevancia práctica:** { 
+                                    'El efecto es muy pequeño, posiblemente sin relevancia práctica importante.' if abs(r_effect) < 0.1 else
+                                    'El efecto es pequeño, puede tener relevancia práctica limitada.' if abs(r_effect) < 0.3 else
+                                    'El efecto es mediano, tiene relevancia práctica moderada.' if abs(r_effect) < 0.5 else
+                                    'El efecto es grande, tiene importante relevancia práctica.'
+                                }
+                                """)
+                                
+                                # Limitaciones y consideraciones
+                                st.markdown("""
+                                ### ⚠️ **LIMITACIONES Y CONSIDERACIONES**
+                                """)
+                                
+                                st.markdown(f"""
+                                1. **Potencia estadística:** Con n₁ = {len(data1)} y n₂ = {len(data2)}, {
+                                    'la potencia puede ser limitada para detectar efectos pequeños.' if min(len(data1), len(data2)) < 20 else
+                                    'la potencia es adecuada para detectar efectos de tamaño moderado.'
+                                }
+                                
+                                2. **Supuestos verificados:** {
+                                    '✓ Los grupos son independientes' + 
+                                    ('\n   ⚠️ Verificar normalidad de los datos' if len(data1) < 30 or len(data2) < 30 else '\n   ✓ Tamaños de muestra adecuados para aproximación normal')
+                                }
+                                
+                                3. **Interpretación cautelosa:** La prueba compara distribuciones, no necesariamente medias.
+                                
+                                4. **Replicabilidad:** Se recomienda replicar el estudio con nueva muestra para confirmar resultados.
+                                """)
+                                
+                                # Recomendaciones para acción
+                                st.markdown("""
+                                ### 🎯 **RECOMENDACIONES PARA ACCIÓN**
+                                """)
+                                
+                                if p_value < alpha_nonpar:
+                                    if abs(r_effect) >= 0.3:
+                                        st.success("""
+                                        **✓ ACCIÓN RECOMENDADA:**
+                                        1. **Implementar intervenciones** basadas en la diferencia encontrada
+                                        2. **Monitorear el impacto** con métricas clave
+                                        3. **Documentar los hallazgos** para futuras decisiones
+                                        4. **Considerar ampliar** el estudio a otros grupos
+                                        """)
+                                    else:
+                                        st.warning("""
+                                        **✓ CONSIDERAR CAUTELOSAMENTE:**
+                                        1. **Evaluar costo-beneficio** de cualquier intervención
+                                        2. **Realizar análisis adicionales** para entender mejor la diferencia
+                                        3. **Considerar factores contextuales** que puedan explicar resultados
+                                        4. **Planificar estudio de seguimiento** con mayor potencia
+                                        """)
+                                else:
+                                    st.info("""
+                                    **✓ ACCIONES RECOMENDADAS:**
+                                    1. **Mantener status quo** si no hay evidencia de problema
+                                    2. **Revisar diseño del estudio** (¿potencia suficiente?)
+                                    3. **Explorar otras variables** que puedan explicar diferencias
+                                    4. **Considerar prueba unilateral** si hay hipótesis direccional
+                                    5. **Evaluar necesidad** de mayor tamaño muestral
+                                    """)
+                                
+                                # Gráfico comparativo
+                                st.markdown("""
+                                ### 📊 **VISUALIZACIÓN COMPARATIVA**
+                                """)
+                                
+                                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+                                
+                                # Boxplot
+                                plot_data = pd.DataFrame({
+                                    'Grupo': [group1]*len(data1) + [group2]*len(data2),
+                                    'Valor': list(data1) + list(data2)
+                                })
+                                sns.boxplot(data=plot_data, x='Grupo', y='Valor', ax=ax1, palette='Set2')
+                                ax1.set_title(f'Comparación de {mw_var}\npor {mw_group}')
+                                ax1.set_ylabel(mw_var)
+                                
+                                # Distribución acumulada
+                                for group, data, color in [(group1, data1, 'blue'), (group2, data2, 'red')]:
+                                    sorted_data = np.sort(data)
+                                    yvals = np.arange(len(sorted_data))/float(len(sorted_data))
+                                    ax2.plot(sorted_data, yvals, label=group, color=color, linewidth=2)
+                                
+                                ax2.set_title('Distribución Acumulada (ECDF)')
+                                ax2.set_xlabel(mw_var)
+                                ax2.set_ylabel('Proporción acumulada')
+                                ax2.legend()
+                                ax2.grid(True, alpha=0.3)
+                                
+                                plt.tight_layout()
+                                st.pyplot(fig)
+                                
                     except Exception as e:
                         st.error(f"Error en Mann-Whitney U: {e}")
             else:
-                st.warning("La variable categórica debe tener exactamente 2 grupos")
+                st.warning(f"La variable '{mw_group}' debe tener exactamente 2 grupos. Tiene {len(unique_groups)} grupos.")
         
-        elif nonpar_test == "Wilcoxon (Pareada)" and numeric_cols:
-            st.subheader("Prueba de Wilcoxon para Muestras Pareadas")
-            
-            if len(numeric_cols) >= 2:
-                col1, col2 = st.columns(2)
-                with col1:
-                    wilcoxon_before = st.selectbox("Variable 'Antes':", numeric_cols, key="wilcoxon_before_tab8")
-                with col2:
-                    wilcoxon_after = st.selectbox("Variable 'Después':", numeric_cols, key="wilcoxon_after_tab8")
-                
-                if st.button("📊 Ejecutar Prueba de Wilcoxon", key="wilcoxon_button_tab8"):
-                    try:
-                        paired_data = df[[wilcoxon_before, wilcoxon_after]].dropna()
-                        
-                        if len(paired_data) < 3:
-                            st.error("Se necesitan al menos 3 pares completos de observaciones")
-                        else:
-                            differences = paired_data[wilcoxon_after] - paired_data[wilcoxon_before]
-                            w_stat, p_value = stats.wilcoxon(differences)
-                            
-                            st.subheader("📋 Resultados")
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric("Estadístico W", f"{w_stat:.4f}")
-                            with col2:
-                                st.metric("p-valor", f"{p_value:.4f}")
-                            
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric(f"Mediana '{wilcoxon_before}'", f"{paired_data[wilcoxon_before].median():.4f}")
-                                st.metric(f"Rango IQ '{wilcoxon_before}'", 
-                                        f"{paired_data[wilcoxon_before].quantile(0.75) - paired_data[wilcoxon_before].quantile(0.25):.4f}")
-                            with col2:
-                                st.metric(f"Mediana '{wilcoxon_after}'", f"{paired_data[wilcoxon_after].median():.4f}")
-                                st.metric(f"Rango IQ '{wilcoxon_after}'", 
-                                        f"{paired_data[wilcoxon_after].quantile(0.75) - paired_data[wilcoxon_after].quantile(0.25):.4f}")
-                            
-                            st.metric("Mediana de diferencias", f"{differences.median():.4f}")
-                            st.metric("Número de pares", len(paired_data))
-                            
-                            if p_value < alpha_nonpar:
-                                st.success(f"✅ **Se rechaza la hipótesis nula** (p = {p_value:.4f} < α = {alpha_nonpar})")
-                            else:
-                                st.warning(f"✅ **No se rechaza la hipótesis nula** (p = {p_value:.4f} ≥ α = {alpha_nonpar})")
-                            
-                            # Visualización
-                            st.subheader("📊 Comparación Visual")
-                            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-                            
-                            plot_data = pd.DataFrame({
-                                'Momento': ['Antes'] * len(paired_data) + ['Después'] * len(paired_data),
-                                'Valor': list(paired_data[wilcoxon_before]) + list(paired_data[wilcoxon_after])
-                            })
-                            sns.boxplot(data=plot_data, x='Momento', y='Valor', ax=ax1)
-                            ax1.set_title('Distribución Antes vs Después')
-                            
-                            sns.histplot(differences, kde=True, ax=ax2)
-                            ax2.axvline(0, color='red', linestyle='--', alpha=0.7, label='Sin cambio')
-                            ax2.axvline(differences.median(), color='green', linestyle='-', alpha=0.8, 
-                                        label=f'Mediana diferencias: {differences.median():.4f}')
-                            ax2.set_title('Distribución de las Diferencias')
-                            ax2.set_xlabel('Diferencia (Después - Antes)')
-                            ax2.legend()
-                            
-                            plt.tight_layout()
-                            st.pyplot(fig)
-                            
-                    except Exception as e:
-                        st.error(f"Error en prueba de Wilcoxon: {e}")
-            else:
-                st.warning("Se necesitan al menos 2 variables numéricas para la prueba pareada")
-        
-        elif nonpar_test == "Wilcoxon (Una muestra)" and numeric_cols:
-            st.subheader("Prueba de Wilcoxon para Una Muestra")
-            
-            wilcoxon_var = st.selectbox("Variable numérica:", numeric_cols, key="wilcoxon_onesample_var_tab8")
-            wilcoxon_reference = st.number_input("Valor de referencia (mediana poblacional):", value=0.0, key="wilcoxon_reference_tab8")
-            
-            if st.button("📊 Ejecutar Wilcoxon Una Muestra", key="wilcoxon_onesample_button_tab8"):
-                try:
-                    data = df[wilcoxon_var].dropna()
-                    
-                    if len(data) < 3:
-                        st.error("Se necesitan al menos 3 observaciones")
-                    else:
-                        w_stat, p_value = stats.wilcoxon(data - wilcoxon_reference)
-                        
-                        st.subheader("📋 Resultados")
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("Estadístico W", f"{w_stat:.4f}")
-                        with col2:
-                            st.metric("p-valor", f"{p_value:.4f}")
-                        
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("Mediana muestral", f"{data.median():.4f}")
-                            st.metric("Rango intercuartílico", f"{data.quantile(0.75) - data.quantile(0.25):.4f}")
-                        with col2:
-                            st.metric("Valor de referencia", f"{wilcoxon_reference:.4f}")
-                            st.metric("Tamaño de muestra", len(data))
-                        
-                        if p_value < alpha_nonpar:
-                            st.success(f"✅ **Se rechaza la hipótesis nula** (p = {p_value:.4f} < α = {alpha_nonpar})")
-                        else:
-                            st.warning(f"✅ **No se rechaza la hipótesis nula** (p = {p_value:.4f} ≥ α = {alpha_nonpar})")
-                        
-                        # Visualización
-                        st.subheader("📊 Visualización")
-                        fig, ax = plt.subplots(figsize=(10, 6))
-                        
-                        sns.histplot(data, kde=True, alpha=0.7, ax=ax, label='Distribución muestral')
-                        ax.axvline(data.median(), color='red', linestyle='-', linewidth=2, label=f'Mediana muestral: {data.median():.4f}')
-                        ax.axvline(wilcoxon_reference, color='blue', linestyle='--', linewidth=2, label=f'Valor referencia: {wilcoxon_reference}')
-                        
-                        ax.set_title(f'Distribución de {wilcoxon_var} vs Referencia\n(Prueba de Wilcoxon Una Muestra)')
-                        ax.set_xlabel(wilcoxon_var)
-                        ax.legend()
-                        st.pyplot(fig)
-                        
-                except Exception as e:
-                    st.error(f"Error en Wilcoxon una muestra: {e}")
-        
-        elif nonpar_test == "Welch (varianzas desiguales)" and numeric_cols and categorical_cols:
-            st.subheader("Prueba T de Welch")
-            
-            welch_var = st.selectbox("Variable numérica:", numeric_cols, key="welch_var_tab8")
-            welch_group = st.selectbox("Variable categórica (debe tener 2 grupos):", categorical_cols, key="welch_group_tab8")
-            
-            unique_groups = df[welch_group].dropna().unique()
-            if len(unique_groups) == 2:
-                group1, group2 = unique_groups
-                
-                if st.button("📊 Ejecutar Prueba T de Welch", key="welch_button_tab8"):
-                    try:
-                        data1 = df[df[welch_group] == group1][welch_var].dropna()
-                        data2 = df[df[welch_group] == group2][welch_var].dropna()
-                        
-                        if len(data1) < 2 or len(data2) < 2:
-                            st.error("Cada grupo necesita al menos 2 observaciones")
-                        else:
-                            t_stat, p_value = stats.ttest_ind(data1, data2, equal_var=False)
-                            
-                            levene_stat, levene_p = stats.levene(data1, data2)
-                            
-                            st.subheader("📋 Resultados")
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric("Estadístico t", f"{t_stat:.4f}")
-                            with col2:
-                                st.metric("p-valor", f"{p_value:.4f}")
-                            with col3:
-                                st.metric("Prueba", "Welch")
-                            
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric(f"Media {group1}", f"{data1.mean():.4f}")
-                                st.metric(f"Desviación {group1}", f"{data1.std():.4f}")
-                                st.metric(f"Varianza {group1}", f"{data1.var():.4f}")
-                                st.metric(f"Tamaño {group1}", len(data1))
-                            with col2:
-                                st.metric(f"Media {group2}", f"{data2.mean():.4f}")
-                                st.metric(f"Desviación {group2}", f"{data2.std():.4f}")
-                                st.metric(f"Varianza {group2}", f"{data2.var():.4f}")
-                                st.metric(f"Tamaño {group2}", len(data2))
-                            
-                            st.metric("Diferencia de medias", f"{(data1.mean() - data2.mean()):.4f}")
-                            
-                            if p_value < alpha_nonpar:
-                                st.success(f"✅ **Se rechaza la hipótesis nula** (p = {p_value:.4f} < α = {alpha_nonpar})")
-                            else:
-                                st.warning(f"✅ **No se rechaza la hipótesis nula** (p = {p_value:.4f} ≥ α = {alpha_nonpar})")
-                            
-                            # Visualización
-                            st.subheader("📊 Comparación Visual")
-                            fig, ax = plt.subplots(figsize=(10, 6))
-                            plot_data = pd.DataFrame({
-                                'Grupo': [group1] * len(data1) + [group2] * len(data2),
-                                'Valor': list(data1) + list(data2)
-                            })
-                            sns.boxplot(data=plot_data, x='Grupo', y='Valor', ax=ax)
-                            ax.set_title(f'Comparación de {welch_var} entre {group1} y {group2}\n(Prueba T de Welch - Varianzas desiguales)')
-                            st.pyplot(fig)
-                                    
-                    except Exception as e:
-                        st.error(f"Error en prueba T de Welch: {e}")
-            else:
-                st.warning("La variable categórica debe tener exactamente 2 grupos")
+        # ============================================================================
+        # KRUSKAL-WALLIS (IMPLEMENTACIÓN COMPLETA)
+        # ============================================================================
         
         elif nonpar_test == "Kruskal-Wallis" and numeric_cols and categorical_cols:
-            st.subheader("Prueba de Kruskal-Wallis")
+            st.markdown("#### 📊 Prueba de Kruskal-Wallis")
             
-            kw_var = st.selectbox("Variable numérica:", numeric_cols, key="kw_var_tab8")
-            kw_group = st.selectbox("Variable categórica:", categorical_cols, key="kw_group_tab8")
+            kw_var = st.selectbox("Variable numérica:", numeric_cols, key="kw_var")
+            kw_group = st.selectbox("Variable categórica:", categorical_cols, key="kw_group")
             
-            if st.button("📊 Ejecutar Kruskal-Wallis", key="kw_button_tab8"):
+            if st.button("📊 Ejecutar Kruskal-Wallis", type="primary", use_container_width=True):
                 try:
                     groups_data = []
                     group_names = []
+                    group_medians = []
+                    group_means = []
+                    group_sizes = []
                     
                     for group in df[kw_group].dropna().unique():
                         group_data = df[df[kw_group] == group][kw_var].dropna()
                         if len(group_data) >= 3:
                             groups_data.append(group_data)
                             group_names.append(str(group))
+                            group_medians.append(group_data.median())
+                            group_means.append(group_data.mean())
+                            group_sizes.append(len(group_data))
                     
                     if len(groups_data) < 2:
-                        st.error("Se necesitan al menos 2 grupos con datos válidos")
+                        st.error("Se necesitan al menos 2 grupos con datos")
                     else:
+                        # Ejecutar prueba
                         h_stat, p_value = stats.kruskal(*groups_data)
                         
-                        st.subheader("📋 Resultados")
-                        col1, col2 = st.columns(2)
-                        with col1:
+                        # Calcular eta² como medida de tamaño del efecto
+                        total_n = sum(group_sizes)
+                        eta_squared = (h_stat - (len(groups_data) - 1)) / (total_n - len(groups_data))
+                        
+                        # Resultados
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        with col_res1:
                             st.metric("Estadístico H", f"{h_stat:.4f}")
-                        with col2:
+                            st.metric("Tamaño efecto (η²)", f"{eta_squared:.4f}")
+                        with col_res2:
                             st.metric("p-valor", f"{p_value:.4f}")
+                            st.metric("Grados libertad", len(groups_data)-1)
+                        with col_res3:
+                            st.metric("Número de grupos", len(groups_data))
+                            st.metric("Total observaciones", total_n)
                         
-                        # Estadísticas descriptivas
-                        st.subheader("📊 Estadísticas por Grupo")
-                        stats_by_group = []
-                        for name, data in zip(group_names, groups_data):
-                            stats_by_group.append({
-                                'Grupo': name,
-                                'n': len(data),
-                                'Mediana': f"{data.median():.4f}",
-                                'Rango intercuartílico': f"{data.quantile(0.75) - data.quantile(0.25):.4f}",
-                                'Mínimo': f"{data.min():.4f}",
-                                'Máximo': f"{data.max():.4f}"
-                            })
+                        # MEJORA 1: Exportar resultados CSV
+                        resultados_kw = pd.DataFrame({
+                            'Prueba': ['Kruskal-Wallis'],
+                            'Variable_dependiente': [kw_var],
+                            'Variable_independiente': [kw_group],
+                            'Estadistico_H': [h_stat],
+                            'p_valor': [p_value],
+                            'Significativo': ['Sí' if p_value < alpha_nonpar else 'No'],
+                            'Numero_grupos': [len(groups_data)],
+                            'Total_observaciones': [total_n],
+                            'Tamano_efecto_eta2': [eta_squared],
+                            'Interpretacion_efecto': ['Pequeño' if eta_squared < 0.06 else 'Mediano' if eta_squared < 0.14 else 'Grande']
+                        })
                         
-                        stats_df = pd.DataFrame(stats_by_group)
-                        st.dataframe(stats_df, use_container_width=True)
+                        st.dataframe(resultados_kw, use_container_width=True)
                         
-                        if p_value < alpha_nonpar:
-                            st.success(f"✅ **Se rechaza la hipótesis nula** (p = {p_value:.4f} < α = {alpha_nonpar})")
-                        else:
-                            st.warning(f"✅ **No se rechaza la hipótesis nula** (p = {p_value:.4f} ≥ α = {alpha_nonpar})")
+                        csv_kw = resultados_kw.to_csv(index=False).encode('utf-8')
+                        st.download_button(
+                            label="📥 Descargar Resultados Kruskal-Wallis (CSV)",
+                            data=csv_kw,
+                            file_name=f"kruskal_wallis_{kw_var}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
                         
-                        # Visualización
-                        st.subheader("📈 Visualización")
-                        fig, ax = plt.subplots(figsize=(12, 6))
-                        plot_data = []
-                        for name, data in zip(group_names, groups_data):
-                            for value in data:
-                                plot_data.append({'Grupo': name, 'Valor': value})
+                        # Tabla de estadísticas por grupo
+                        st.subheader("📋 Estadísticas por Grupo")
+                        stats_by_group = pd.DataFrame({
+                            'Grupo': group_names,
+                            'Mediana': group_medians,
+                            'Media': group_means,
+                            'N': group_sizes,
+                            'Desviación': [g.std() for g in groups_data],
+                            'Rango': [f"{g.min():.2f} - {g.max():.2f}" for g in groups_data]
+                        }).sort_values('Mediana', ascending=False)
                         
-                        plot_df = pd.DataFrame(plot_data)
-                        sns.boxplot(data=plot_df, x='Grupo', y='Valor', ax=ax)
-                        ax.set_title(f'Kruskal-Wallis: {kw_var} por {kw_group}\n(H = {h_stat:.3f}, p = {p_value:.4f})')
-                        ax.tick_params(axis='x', rotation=45)
-                        plt.tight_layout()
-                        st.pyplot(fig)
+                        st.dataframe(stats_by_group, use_container_width=True)
+                        
+                        # MEJORA 2: SECCIÓN DE ANÁLISIS Y CONCLUSIONES
+                        with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
+                            
+                            # Decisión estadística
+                            if p_value < alpha_nonpar:
+                                decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                decision_explanation = f"Existe evidencia de diferencias entre al menos un par de grupos (p = {p_value:.4f} < α = {alpha_nonpar})"
+                                color = "success"
+                            else:
+                                decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                decision_explanation = f"No hay evidencia suficiente de diferencias entre grupos (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
+                                color = "warning"
+                            
+                            st.markdown(f"""
+                            ### 🎯 **DECISIÓN ESTADÍSTICA**
+                            
+                            {decision_text}
+                            
+                            *{decision_explanation}*
+                            """)
+                            
+                            # Interpretación sustantiva
+                            st.markdown("""
+                            ### 📈 **INTERPRETACIÓN SUSTANTIVA**
+                            """)
+                            
+                            if p_value < alpha_nonpar:
+                                # Encontrar grupo con mayor y menor mediana
+                                max_idx = np.argmax(group_medians)
+                                min_idx = np.argmin(group_medians)
+                                max_group = group_names[max_idx]
+                                min_group = group_names[min_idx]
+                                max_median = group_medians[max_idx]
+                                min_median = group_medians[min_idx]
                                 
+                                st.success(f"""
+                                **Hay diferencias estadísticamente significativas** entre los {len(groups_data)} grupos 
+                                en la variable '{kw_var}'.
+                                
+                                **El grupo con mayor mediana** es '{max_group}' ({max_median:.2f}) y 
+                                **el grupo con menor mediana** es '{min_group}' ({min_median:.2f}).
+                                
+                                **La diferencia máxima observada** entre medianas es de {max_median - min_median:.2f}.
+                                """)
+                            else:
+                                st.warning(f"""
+                                **NO hay evidencia de diferencias significativas** entre los {len(groups_data)} grupos 
+                                en la variable '{kw_var}'.
+                                
+                                **Las diferencias observadas** entre las medianas de los grupos 
+                                **podrían deberse al azar** o variación muestral.
+                                """)
+                            
+                            # Tamaño del efecto
+                            st.markdown("""
+                            ### 📏 **TAMAÑO DEL EFECTO (η²)**
+                            """)
+                            
+                            eta_desc = ""
+                            if eta_squared < 0.01:
+                                eta_desc = "**insignificante** (η² < 0.01)"
+                                eta_icon = "🔍"
+                            elif eta_squared < 0.06:
+                                eta_desc = "**pequeño** (0.01 ≤ η² < 0.06)"
+                                eta_icon = "📏"
+                            elif eta_squared < 0.14:
+                                eta_desc = "**mediano** (0.06 ≤ η² < 0.14)"
+                                eta_icon = "📐"
+                            else:
+                                eta_desc = "**grande** (η² ≥ 0.14)"
+                                eta_icon = "📊"
+                            
+                            st.info(f"""
+                            {eta_icon} **Tamaño del efecto (eta cuadrado):** {eta_squared:.4f}
+                            
+                            **Interpretación:** El efecto es {eta_desc}.
+                            
+                            **Proporción de varianza explicada:** El {eta_squared*100:.1f}% de la variabilidad total 
+                            en '{kw_var}' puede atribuirse a las diferencias entre grupos.
+                            """)
+                            
+                            # Pasos siguientes si es significativo
+                            st.markdown("""
+                            ### 🔍 **PASOS SIGUIENTES Y RECOMENDACIONES**
+                            """)
+                            
+                            if p_value < alpha_nonpar:
+                                st.success("""
+                                **✓ PRUEBAS POST-HOC NECESARIAS:**
+                                1. **Realizar comparaciones por pares** (Dunn's test, Conover-Iman)
+                                2. **Ajustar por comparaciones múltiples** (Bonferroni, Holm)
+                                3. **Identificar qué grupos difieren significativamente**
+                                4. **Calcular intervalos de confianza** para diferencias entre medianas
+                                
+                                **✓ ANÁLISIS ADICIONAL RECOMENDADO:**
+                                1. **Gráficos de caja por grupo** para visualizar distribuciones
+                                2. **Análisis de tendencia** si los grupos son ordinales
+                                3. **Pruebas de homogeneidad de varianzas** entre grupos
+                                4. **Análisis de potencia post-hoc** para futuros estudios
+                                """)
+                            else:
+                                st.info("""
+                                **✓ CONSIDERACIONES CUANDO NO HAY SIGNIFICANCIA:**
+                                1. **Evaluar potencia estadística** del estudio
+                                2. **Verificar supuestos** de la prueba
+                                3. **Considerar variables de confusión** no controladas
+                                4. **Explorar análisis de subgrupos** si aplicable
+                                5. **Evaluar necesidad de mayor tamaño muestral**
+                                """)
+                            
+                            # Limitaciones
+                            st.markdown("""
+                            ### ⚠️ **LIMITACIONES DE LA PRUEBA KRUSKAL-WALLIS**
+                            """)
+                            
+                            st.markdown(f"""
+                            1. **Prueba ómnibus:** Solo indica que hay diferencias, no dónde están
+                            2. **Necesita pruebas post-hoc:** Requiere análisis adicional para identificar diferencias específicas
+                            3. **Pérdida de información:** Usa rangos en lugar de valores originales
+                            4. **Menos potencia que ANOVA:** Cuando los datos son normales y varianzas homogéneas
+                            5. **Tamaños de muestra pequeños:** Puede no detectar diferencias reales
+                            6. **Muchos empates:** Puede afectar la precisión de la prueba
+                            """)
+                            
+                            # Visualización
+                            st.markdown("""
+                            ### 📊 **VISUALIZACIÓN DE LOS DATOS**
+                            """)
+                            
+                            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+                            
+                            # Boxplot por grupo
+                            plot_data = []
+                            for name, data in zip(group_names, groups_data):
+                                for value in data:
+                                    plot_data.append({'Grupo': name, 'Valor': value})
+                            
+                            plot_df = pd.DataFrame(plot_data)
+                            sns.boxplot(data=plot_df, x='Grupo', y='Valor', ax=ax1, palette='viridis')
+                            ax1.set_title(f'Distribución de {kw_var}\npor {kw_group}')
+                            ax1.set_ylabel(kw_var)
+                            ax1.tick_params(axis='x', rotation=45)
+                            
+                            # Gráfico de medianas con intervalos
+                            median_df = pd.DataFrame({
+                                'Grupo': group_names,
+                                'Mediana': group_medians
+                            }).sort_values('Mediana')
+                            
+                            ax2.barh(median_df['Grupo'], median_df['Mediana'], color='skyblue', alpha=0.7)
+                            ax2.set_xlabel('Mediana')
+                            ax2.set_title('Medianas por Grupo (Ordenadas)')
+                            ax2.grid(True, alpha=0.3, axis='x')
+                            
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                            
                 except Exception as e:
                     st.error(f"Error en Kruskal-Wallis: {e}")
         
+        # ============================================================================
+        # CHI-CUADRADO (IMPLEMENTACIÓN COMPLETA)
+        # ============================================================================
+        
         elif nonpar_test == "Chi-cuadrado" and categorical_cols:
-            st.subheader("Prueba de Chi-cuadrado")
+            st.markdown("#### 📊 Prueba de Chi-cuadrado de Independencia")
             
             if len(categorical_cols) >= 2:
-                chi_var1 = st.selectbox("Variable categórica 1:", categorical_cols, key="chi_var1_tab8")
-                chi_var2 = st.selectbox("Variable categórica 2:", categorical_cols, key="chi_var2_tab8")
+                col1, col2 = st.columns(2)
+                with col1:
+                    chi_var1 = st.selectbox("Variable fila:", categorical_cols, key="chi_var1")
+                with col2:
+                    chi_var2 = st.selectbox("Variable columna:", categorical_cols, key="chi_var2")
                 
-                if st.button("📊 Ejecutar Chi-cuadrado", key="chi_button_tab8"):
+                if st.button("📊 Ejecutar Chi-cuadrado", type="primary", use_container_width=True):
                     try:
+                        # Crear tabla de contingencia
                         contingency_table = pd.crosstab(df[chi_var1], df[chi_var2])
                         
                         if contingency_table.size == 0 or contingency_table.sum().sum() < 10:
                             st.error("No hay suficientes datos para realizar la prueba")
                         else:
+                            # Ejecutar prueba
                             chi2_stat, p_value, dof, expected = stats.chi2_contingency(contingency_table)
                             
+                            # Calcular frecuencias esperadas bajas
                             expected_lt_5 = (expected < 5).sum()
                             total_cells = expected.size
                             percent_lt_5 = (expected_lt_5 / total_cells) * 100
                             
-                            st.subheader("📋 Resultados")
-                            col1, col2, col3 = st.columns(3)
-                            with col1:
-                                st.metric("Estadístico χ²", f"{chi2_stat:.4f}")
-                            with col2:
+                            # Calcular medidas de asociación
+                            n_total = contingency_table.sum().sum()
+                            phi = np.sqrt(chi2_stat / n_total) if contingency_table.shape == (2, 2) else None
+                            
+                            # V de Cramer
+                            min_dim = min(contingency_table.shape) - 1
+                            v_cramer = np.sqrt(chi2_stat / (n_total * min_dim))
+                            
+                            # Resultados
+                            col_res1, col_res2, col_res3 = st.columns(3)
+                            with col_res1:
+                                st.metric("χ²", f"{chi2_stat:.4f}")
+                                if phi:
+                                    st.metric("φ (Phi)", f"{phi:.4f}")
+                            with col_res2:
                                 st.metric("p-valor", f"{p_value:.4f}")
-                            with col3:
-                                st.metric("Grados de libertad", dof)
+                                st.metric("V de Cramer", f"{v_cramer:.4f}")
+                            with col_res3:
+                                st.metric("Grados libertad", dof)
+                                st.metric("Total casos", n_total)
                             
+                            # Advertencia sobre frecuencias esperadas
                             if percent_lt_5 > 20:
-                                st.warning(f"⚠️ **Advertencia:** {percent_lt_5:.1f}% de las celdas tienen frecuencia esperada < 5. Considera agrupar categorías.")
+                                st.warning(f"⚠️ {percent_lt_5:.1f}% de celdas tienen frecuencia esperada < 5")
+                                st.info("**Recomendación:** Considerar prueba exacta de Fisher o agrupar categorías")
                             
+                            # MEJORA 1: Exportar resultados CSV
+                            resultados_chi = pd.DataFrame({
+                                'Prueba': ['Chi-cuadrado de independencia'],
+                                'Variable_fila': [chi_var1],
+                                'Variable_columna': [chi_var2],
+                                'Estadistico_chi2': [chi2_stat],
+                                'p_valor': [p_value],
+                                'Grados_libertad': [dof],
+                                'Total_casos': [n_total],
+                                'Filas': [contingency_table.shape[0]],
+                                'Columnas': [contingency_table.shape[1]],
+                                'Celdas_frecuencia_esperada_baja': [f"{percent_lt_5:.1f}%"],
+                                'V_de_Cramer': [v_cramer],
+                                'Phi_coefficient': [phi if phi else 'N/A'],
+                                'Significativo': ['Sí' if p_value < alpha_nonpar else 'No']
+                            })
+                            
+                            st.dataframe(resultados_chi, use_container_width=True)
+                            
+                            csv_chi = resultados_chi.to_csv(index=False).encode('utf-8')
+                            st.download_button(
+                                label="📥 Descargar Resultados Chi-cuadrado (CSV)",
+                                data=csv_chi,
+                                file_name=f"chi_cuadrado_{chi_var1}_{chi_var2}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                                mime="text/csv",
+                                use_container_width=True
+                            )
+                            
+                            # Mostrar tabla de contingencia
                             st.subheader("📊 Tabla de Contingencia (Frecuencias Observadas)")
                             st.dataframe(contingency_table, use_container_width=True)
                             
-                            st.subheader("📈 Porcentajes por Fila")
-                            row_pct = contingency_table.div(contingency_table.sum(axis=1), axis=0) * 100
-                            st.dataframe(row_pct.round(2), use_container_width=True)
+                            # Mostrar tabla de frecuencias esperadas
+                            with st.expander("📋 Ver frecuencias esperadas"):
+                                expected_df = pd.DataFrame(expected, 
+                                                        index=contingency_table.index, 
+                                                        columns=contingency_table.columns)
+                                st.dataframe(expected_df.round(2), use_container_width=True)
                             
-                            if p_value < alpha_nonpar:
-                                st.success(f"✅ **Se rechaza la hipótesis nula** (p = {p_value:.4f} < α = {alpha_nonpar})")
-                            else:
-                                st.warning(f"✅ **No se rechaza la hipótesis nula** (p = {p_value:.4f} ≥ α = {alpha_nonpar})")
-                                        
+                            # Mostrar tabla de porcentajes por fila
+                            st.subheader("📈 Porcentajes por Fila")
+                            row_pct = (contingency_table.div(contingency_table.sum(axis=1), axis=0) * 100).round(1)
+                            st.dataframe(row_pct, use_container_width=True)
+                            
+                            # MEJORA 2: SECCIÓN DE ANÁLISIS Y CONCLUSIONES
+                            with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
+                                
+                                # Decisión estadística
+                                if p_value < alpha_nonpar:
+                                    decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                    decision_explanation = f"Existe asociación entre '{chi_var1}' y '{chi_var2}' (p = {p_value:.4f} < α = {alpha_nonpar})"
+                                    color = "success"
+                                else:
+                                    decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                    decision_explanation = f"No hay evidencia de asociación entre '{chi_var1}' y '{chi_var2}' (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
+                                    color = "warning"
+                                
+                                st.markdown(f"""
+                                ### 🎯 **DECISIÓN ESTADÍSTICA**
+                                
+                                {decision_text}
+                                
+                                *{decision_explanation}*
+                                """)
+                                
+                                # Interpretación sustantiva
+                                st.markdown("""
+                                ### 📈 **INTERPRETACIÓN SUSTANTIVA**
+                                """)
+                                
+                                if p_value < alpha_nonpar:
+                                    st.success(f"""
+                                    **Hay una asociación estadísticamente significativa** entre las variables 
+                                    '{chi_var1}' y '{chi_var2}'.
+                                    
+                                    **Las variables NO son independientes:** Los valores de una variable están 
+                                    relacionados con los valores de la otra variable.
+                                    
+                                    **La asociación observada** en los datos de la muestra **NO parece deberse al azar** 
+                                    con un nivel de confianza del {(1-alpha_nonpar)*100:.0f}%.
+                                    """)
+                                else:
+                                    st.warning(f"""
+                                    **NO hay evidencia de asociación significativa** entre las variables 
+                                    '{chi_var1}' y '{chi_var2}'.
+                                    
+                                    **Las variables parecen ser independientes:** Los valores de una variable 
+                                    no están relacionados sistemáticamente con los valores de la otra variable.
+                                    
+                                    **Cualquier patrón observado** en la tabla de contingencia **podría deberse al azar**.
+                                    """)
+                                
+                                # Fuerza de la asociación
+                                st.markdown("""
+                                ### 💪 **FUERZA DE LA ASOCIACIÓN**
+                                """)
+                                
+                                # Interpretar V de Cramer
+                                v_desc = ""
+                                if v_cramer < 0.1:
+                                    v_desc = "**muy débil** (V < 0.1)"
+                                    v_icon = "🔍"
+                                elif v_cramer < 0.3:
+                                    v_desc = "**débil** (0.1 ≤ V < 0.3)"
+                                    v_icon = "📏"
+                                elif v_cramer < 0.5:
+                                    v_desc = "**moderada** (0.3 ≤ V < 0.5)"
+                                    v_icon = "📐"
+                                else:
+                                    v_desc = "**fuerte** (V ≥ 0.5)"
+                                    v_icon = "📊"
+                                
+                                # Interpretar Phi para tablas 2x2
+                                phi_desc = ""
+                                if phi:
+                                    if abs(phi) < 0.1:
+                                        phi_desc = "**muy débil** (|φ| < 0.1)"
+                                    elif abs(phi) < 0.3:
+                                        phi_desc = "**débil** (0.1 ≤ |φ| < 0.3)"
+                                    elif abs(phi) < 0.5:
+                                        phi_desc = "**moderada** (0.3 ≤ |φ| < 0.5)"
+                                    else:
+                                        phi_desc = "**fuerte** (|φ| ≥ 0.5)"
+                                
+                                st.info(f"""
+                                {v_icon} **V de Cramer:** {v_cramer:.4f}
+                                
+                                **Interpretación:** La fuerza de la asociación es {v_desc}.
+                                
+                                {f"**φ (Phi):** {phi:.4f} - {phi_desc}" if phi else ""}
+                                
+                                **Relevancia práctica:** {
+                                    'La asociación es muy débil, posiblemente sin relevancia práctica.' if v_cramer < 0.1 else
+                                    'La asociación es débil, relevancia práctica limitada.' if v_cramer < 0.3 else
+                                    'La asociación es moderada, tiene relevancia práctica.' if v_cramer < 0.5 else
+                                    'La asociación es fuerte, tiene importante relevancia práctica.'
+                                }
+                                """)
+                                
+                                # Análisis de residuos estandarizados
+                                st.markdown("""
+                                ### 🔍 **ANÁLISIS DE PATRONES ESPECÍFICOS**
+                                """)
+                                
+                                # Calcular residuos estandarizados
+                                residuals = (contingency_table - expected) / np.sqrt(expected)
+                                residuals = residuals.round(2)
+                                
+                                # Identificar celdas con mayores residuos
+                                max_residual_idx = np.unravel_index(np.argmax(np.abs(residuals.values)), residuals.shape)
+                                max_residual_value = residuals.iloc[max_residual_idx[0], max_residual_idx[1]]
+                                max_cell = (contingency_table.index[max_residual_idx[0]], 
+                                        contingency_table.columns[max_residual_idx[1]])
+                                
+                                if abs(max_residual_value) > 1.96:  # Significativo al 95%
+                                    st.info(f"""
+                                    **Celda con mayor contribución a χ²:**
+                                    - Combinación: '{max_cell[0]}' × '{max_cell[1]}'
+                                    - Residuo estandarizado: {max_residual_value:.2f}
+                                    - Interpretación: Hay {'más' if max_residual_value > 0 else 'menos'} casos de lo esperado
+                                    
+                                    **Esta celda contribuye significativamente** a la asociación global.
+                                    """)
+                                
+                                # Recomendaciones para análisis adicional
+                                st.markdown("""
+                                ### 🎯 **RECOMENDACIONES PARA ANÁLISIS ADICIONAL**
+                                """)
+                                
+                                if p_value < alpha_nonpar:
+                                    st.success("""
+                                    **✓ ANÁLISIS RECOMENDADOS CUANDO HAY ASOCIACIÓN:**
+                                    1. **Examinar residuos estandarizados** para identificar patrones específicos
+                                    2. **Calcular odds ratios** para pares de categorías (si tabla 2x2)
+                                    3. **Realizar análisis de correspondencia** para visualizar relaciones
+                                    4. **Probar modelos log-lineales** para relaciones más complejas
+                                    5. **Analizar medidas de asociación específicas** (gamma, tau-b para ordinales)
+                                    
+                                    **✓ INTERPRETACIÓN CAUTELOSA:**
+                                    1. **Correlación ≠ causalidad:** La asociación no implica causa-efecto
+                                    2. **Variables de confusión:** Podría haber terceras variables explicando la relación
+                                    3. **Tamaño del efecto:** Considerar relevancia práctica además de significancia estadística
+                                    """)
+                                else:
+                                    st.info("""
+                                    **✓ CONSIDERACIONES CUANDO NO HAY ASOCIACIÓN:**
+                                    1. **Verificar supuestos:** Frecuencias esperadas adecuadas
+                                    2. **Evaluar potencia:** ¿Tamaño de muestra suficiente?
+                                    3. **Considerar agrupar categorías:** Si hay muchas con frecuencias bajas
+                                    4. **Explorar relaciones no lineales:** Que χ² no detecta
+                                    5. **Analizar subgrupos:** Podría haber asociación en subpoblaciones específicas
+                                    
+                                    **✓ PRUEBAS ALTERNATIVAS:**
+                                    1. **Prueba exacta de Fisher:** Para tablas pequeñas o frecuencias bajas
+                                    2. **Prueba de razón de verosimilitud:** Alternativa a χ²
+                                    3. **Pruebas para datos ordinales:** Más potentes si hay orden natural
+                                    """)
+                                
+                                # Limitaciones y consideraciones
+                                st.markdown("""
+                                ### ⚠️ **LIMITACIONES Y CONSIDERACIONES**
+                                """)
+                                
+                                st.markdown(f"""
+                                1. **Supuestos verificados:** {
+                                    f"⚠️ {percent_lt_5:.1f}% de celdas con frecuencia esperada < 5" if percent_lt_5 > 20 else 
+                                    "✓ Frecuencias esperadas adecuadas en ≥80% de celdas"
+                                }
+                                
+                                2. **Independencia de observaciones:** Se asume que cada caso contribuye a una sola celda
+                                
+                                3. **Variables nominales:** La prueba no considera orden natural si existe
+                                
+                                4. **Sensibilidad al tamaño muestral:** Con n grande, puede encontrar significancia para asociaciones triviales
+                                
+                                5. **Tablas grandes:** Con muchas celdas, la prueba puede perder potencia
+                                
+                                6. **Empates:** No aplica para datos continuos agrupados en categorías
+                                """)
+                                
+                                # Visualización
+                                st.markdown("""
+                                ### 📊 **VISUALIZACIÓN DE LA ASOCIACIÓN**
+                                """)
+                                
+                                fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+                                
+                                # Heatmap de la tabla de contingencia
+                                sns.heatmap(contingency_table, annot=True, fmt='d', cmap='YlOrRd', 
+                                        cbar_kws={'label': 'Frecuencia'}, ax=ax1)
+                                ax1.set_title(f'Tabla de Contingencia: {chi_var1} × {chi_var2}')
+                                ax1.set_xlabel(chi_var2)
+                                ax1.set_ylabel(chi_var1)
+                                
+                                # Gráfico de barras apiladas
+                                contingency_table.div(contingency_table.sum(axis=1), axis=0).plot(
+                                    kind='bar', stacked=True, ax=ax2, colormap='tab20c', alpha=0.8
+                                )
+                                ax2.set_title('Distribución Relativa por Fila')
+                                ax2.set_xlabel(chi_var1)
+                                ax2.set_ylabel('Proporción')
+                                ax2.legend(title=chi_var2, bbox_to_anchor=(1.05, 1), loc='upper left')
+                                ax2.tick_params(axis='x', rotation=45)
+                                
+                                plt.tight_layout()
+                                st.pyplot(fig)
+                                
                     except Exception as e:
                         st.error(f"Error en Chi-cuadrado: {e}")
-                else:
-                    st.warning("Se necesitan al menos 2 variables categóricas")
 
 # Mensaje final si no hay datos cargados
 else:
