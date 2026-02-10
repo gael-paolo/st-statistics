@@ -1001,7 +1001,7 @@ if df is not None:
                         **Regla general (Teorema Central del Límite):**
                         - Con muestras grandes (n ≥ 30), la distribución de medias tiende a ser normal
                         - Esto hace que las pruebas paramétricas sean robustas incluso con datos no normales
-                        - EXCEPCIÓN: Datas con outliers extremos o distribuciones muy asimétricas
+                        - EXCEPCIÓN: Datos con outliers extremos o distribuciones muy asimétricas
                         """)
                         
                         # ==========================================
@@ -1069,7 +1069,7 @@ if df is not None:
                         
                         # Calcular outliers
                         Q1 = data.quantile(0.25)
-                        Q3 = data.quantile(0.25)
+                        Q3 = data.quantile(0.75)
                         IQR = Q3 - Q1
                         outliers = data[(data < Q1 - 1.5*IQR) | (data > Q3 + 1.5*IQR)]
                         
