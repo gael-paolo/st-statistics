@@ -23,17 +23,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Título principal - CAMBIO 2: Generalizar de People Analytics a análisis general
+# Título principal
 st.title("🤖 Analytics Stats Bot")
 st.markdown("""
 Esta aplicación te ayuda a realizar análisis estadísticos descriptivos e inferenciales para diversos tipos de datos.
-Carga tus datos y consulta a OpenAI qué análisis realizar, luego ejecuta las funciones disponibles.
+Carga tus datos y consulta al asistente qué análisis realizar, luego ejecuta las funciones disponibles.
 """)
 
 # Sidebar para configuración
 st.sidebar.header("🔧 Configuración")
 
-# Configuración de OpenAI API - CAMBIO 1: Cambiar de Gemini a OpenAI
+# Configuración de OpenAI API
 st.sidebar.subheader("Configuración de OpenAI")
 openai_api_key = st.sidebar.text_input("Ingresa tu API Key de OpenAI:", type="password")
 
@@ -48,8 +48,8 @@ if openai_api_key:
 else:
     st.sidebar.warning("⚠️ Ingresa tu API Key de OpenAI para usar las recomendaciones")
 
-# Función para consultar a OpenAI - CAMBIO 1
-def consultar_openai(prompt, max_tokens=2000, temperature=0.7, model="gpt-4"):
+# Función para consultar a OpenAI
+def consultar_openai(prompt, max_tokens=2000, temperature=0.5, model="gpt-4.1-mini"):
     """Consulta a OpenAI GPT para obtener recomendaciones y explicaciones"""
     try:
         if not openai_client:
@@ -68,7 +68,7 @@ def consultar_openai(prompt, max_tokens=2000, temperature=0.7, model="gpt-4"):
     except Exception as e:
         return f"Error al consultar OpenAI: {str(e)}"
 
-# ASISTENTE TEÓRICO EN ESTADÍSTICA (se muestra siempre, sin necesidad de datos)
+# ASISTENTE TEÓRICO EN ESTADÍSTICA
 st.subheader("📚 Asistente Teórico en Estadística")
 st.markdown("""
 Consulta conceptos teóricos sobre métodos estadísticos, interpretación de resultados y mejores prácticas.
@@ -86,7 +86,7 @@ if st.button("Consultar teoría estadística", key="theory_consultation_main") a
     if openai_api_key:
         with st.spinner("El experto en estadística está analizando tu consulta..."):
             try:
-                # Preparar contexto para asesoría teórica
+
                 theory_context = f"""
                 Eres un experto en estadística aplicada y metodología de investigación. 
                 Responde la siguiente pregunta teórica sobre conceptos estadísticos:
@@ -115,7 +115,6 @@ if st.button("Consultar teoría estadística", key="theory_consultation_main") a
                 theory_response = consultar_openai(theory_context)
                 st.success("📚 Respuesta del Experto en Estadística:")
                 
-                # Mejorar la presentación de la respuesta
                 st.markdown("---")
                 st.markdown(theory_response)
                 st.markdown("---")
@@ -224,7 +223,6 @@ df = None
 if uploaded_file is not None:
     try:
         df = load_data(uploaded_file)
-        # Eliminar columna Unnamed: 0 si existe
         if 'Unnamed: 0' in df.columns:
             df = df.drop('Unnamed: 0', axis=1)
         st.sidebar.success(f"✅ Datos cargados: {df.shape[0]} filas, {df.shape[1]} columnas")
@@ -263,7 +261,6 @@ if df is not None:
         else:
             st.warning("No se encontraron variables categóricas")
 
-    # Sección de consulta a OpenAI PARA DATOS ESPECÍFICOS (esta va después de cargar datos)
     st.subheader("🤖 Asistente de Análisis para tus Datos")
     st.markdown("Consulta recomendaciones específicas basadas en los datos que has cargado.")
     
@@ -276,9 +273,9 @@ if df is not None:
     
     if st.button("Obtener recomendaciones de análisis", key="business_recommendations_main") and user_question:
         if openai_api_key:
-            with st.spinner("OpenAI está analizando tu caso y datos..."):
+            with st.spinner("El asistente está analizando tu caso y datos..."):
                 try:
-                    # Preparar contexto para OpenAI
+
                     context = f"""
                     Tengo un dataset con {df.shape[0]} filas y {df.shape[1]} columnas.
                     Variables numéricas: {numeric_cols}
@@ -564,7 +561,7 @@ if df is not None:
                     ax.set_title(f'Boxplot de {selected_var}')
                     st.pyplot(fig)
         
-        # Reporte descriptivo básico (sin ydata_profiling) - CAMBIO 3: Quitar profiling
+        # Reporte descriptivo básico
         st.subheader("Reporte Descriptivo Básico")
         st.markdown("Genera un reporte básico de análisis exploratorio de datos.")
         
@@ -612,7 +609,7 @@ if df is not None:
                                     percentage = (count / len(df)) * 100
                                     report_content.append(f"  - {value}: {count} ({percentage:.2f}%)")
                     
-                    # 4. Matriz de correlaciones (solo si hay suficientes variables numéricas)
+                    # 4. Matriz de correlaciones
                     if len(numeric_cols) >= 2:
                         report_content.append("\n## 📈 MATRIZ DE CORRELACIONES")
                         corr_matrix = df[numeric_cols].corr()
@@ -1856,14 +1853,13 @@ if df is not None:
 
 
     # ============================================================================
-    # PESTAÑA 8: PRUEBAS NO PARAMÉTRICAS (CON MEJORAS COMPLETAS)
+    # PESTAÑA 8: PRUEBAS NO PARAMÉTRICAS
     # ============================================================================
 
     with tab8:
         st.subheader("🔄 Pruebas No Paramétricas")
         st.markdown("Alternativas a las pruebas paramétricas cuando no se cumplen los supuestos de normalidad o con datos ordinales.")
         
-        # MEJORA 2: Selector con descripciones detalladas
         nonpar_options = {
             "Mann-Whitney U": "Compara 2 grupos independientes (no normales)",
             "Kruskal-Wallis": "Compara 3+ grupos independientes (no normales)",
@@ -1883,7 +1879,7 @@ if df is not None:
         alpha_nonpar = st.slider("Nivel de significancia (α):", 0.01, 0.10, 0.05, key="alpha_nonpar")
         
         # ============================================================================
-        # SECCIÓN DE EXPLICACIÓN PARA CADA PRUEBA (MEJORA 2)
+        # SECCIÓN DE EXPLICACIÓN PARA CADA PRUEBA
         # ============================================================================
         
         with st.expander("📚 **Explicación Teórica de la Prueba**", expanded=True):
@@ -2119,7 +2115,7 @@ if df is not None:
                 """)
         
         # ============================================================================
-        # MANN-WHITNEY U (IMPLEMENTACIÓN COMPLETA)
+        # MANN-WHITNEY U
         # ============================================================================
         
         if nonpar_test == "Mann-Whitney U" and numeric_cols and categorical_cols:
@@ -2163,7 +2159,7 @@ if df is not None:
                                 st.metric(f"Mediana {group1}", f"{data1.median():.4f}")
                                 st.metric(f"Mediana {group2}", f"{data2.median():.4f}")
                             
-                            # MEJORA 1: Exportar resultados CSV
+                            # Exportar resultados CSV
                             resultados_mw = pd.DataFrame({
                                 'Prueba': ['Mann-Whitney U'],
                                 'Variable': [mw_var],
@@ -2191,16 +2187,16 @@ if df is not None:
                                 use_container_width=True
                             )
                             
-                            # MEJORA 2: SECCIÓN DE ANÁLISIS Y CONCLUSIONES
+                            # SECCIÓN DE ANÁLISIS Y CONCLUSIONES
                             with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
                                 
                                 # Decisión estadística
                                 if p_value < alpha_nonpar:
-                                    decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                    decision_text = "✅ **RECHAZAR la hipótesis nula**"
                                     decision_explanation = f"El p-valor ({p_value:.4f}) es menor que el nivel de significancia α ({alpha_nonpar})"
                                     color = "success"
                                 else:
-                                    decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                    decision_text = "⏸️ **NO RECHAZAR la hipótesis nula**"
                                     decision_explanation = f"El p-valor ({p_value:.4f}) es mayor o igual que el nivel de significancia α ({alpha_nonpar})"
                                     color = "warning"
                                 
@@ -2356,7 +2352,7 @@ if df is not None:
                 st.warning(f"La variable '{mw_group}' debe tener exactamente 2 grupos. Tiene {len(unique_groups)} grupos.")
         
         # ============================================================================
-        # KRUSKAL-WALLIS (IMPLEMENTACIÓN COMPLETA)
+        # KRUSKAL-WALLIS
         # ============================================================================
         
         elif nonpar_test == "Kruskal-Wallis" and numeric_cols and categorical_cols:
@@ -2404,7 +2400,7 @@ if df is not None:
                             st.metric("Número de grupos", len(groups_data))
                             st.metric("Total observaciones", total_n)
                         
-                        # MEJORA 1: Exportar resultados CSV
+                        # Exportar resultados CSV
                         resultados_kw = pd.DataFrame({
                             'Prueba': ['Kruskal-Wallis'],
                             'Variable_dependiente': [kw_var],
@@ -2442,16 +2438,16 @@ if df is not None:
                         
                         st.dataframe(stats_by_group, use_container_width=True)
                         
-                        # MEJORA 2: SECCIÓN DE ANÁLISIS Y CONCLUSIONES
+                        # SECCIÓN DE ANÁLISIS Y CONCLUSIONES
                         with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
                             
                             # Decisión estadística
                             if p_value < alpha_nonpar:
-                                decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                decision_text = "✅ **RECHAZAR la hipótesis nula**"
                                 decision_explanation = f"Existe evidencia de diferencias entre al menos un par de grupos (p = {p_value:.4f} < α = {alpha_nonpar})"
                                 color = "success"
                             else:
-                                decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                decision_text = "⏸️ **NO RECHAZAR la hipótesis nula**"
                                 decision_explanation = f"No hay evidencia suficiente de diferencias entre grupos (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
                                 color = "warning"
                             
@@ -2603,7 +2599,7 @@ if df is not None:
                     st.error(f"Error en Kruskal-Wallis: {e}")
         
         # ============================================================================
-        # WILCOXON PAREADA (IMPLEMENTACIÓN COMPLETA)
+        # WILCOXON PAREADA
         # ============================================================================
         
         elif nonpar_test == "Wilcoxon (Pareada)" and len(numeric_cols) >= 2:
@@ -2701,10 +2697,10 @@ if df is not None:
                         with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
                             # Decisión estadística
                             if p_value < alpha_nonpar:
-                                decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                decision_text = "✅ **RECHAZAR la hipótesis nula**"
                                 decision_explanation = f"Existe diferencia significativa entre mediciones (p = {p_value:.4f} < α = {alpha_nonpar})"
                             else:
-                                decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                decision_text = "⏸️ **NO RECHAZAR la hipótesis nula**"
                                 decision_explanation = f"No hay evidencia de diferencia significativa (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
                             
                             st.markdown(f"""
@@ -2760,7 +2756,7 @@ if df is not None:
                     st.error(f"Error en Wilcoxon Pareada: {e}")
         
         # ============================================================================
-        # WILCOXON UNA MUESTRA (IMPLEMENTACIÓN COMPLETA)
+        # WILCOXON UNA MUESTRA
         # ============================================================================
         
         elif nonpar_test == "Wilcoxon (Una muestra)" and numeric_cols:
@@ -2859,10 +2855,10 @@ if df is not None:
                         with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
                             # Decisión estadística
                             if p_value < alpha_nonpar:
-                                decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                decision_text = "✅ **RECHAZAR la hipótesis nula**"
                                 decision_explanation = f"La mediana difiere significativamente de {reference_value} (p = {p_value:.4f} < α = {alpha_nonpar})"
                             else:
-                                decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                decision_text = "⏸️ **NO RECHAZAR la hipótesis nula**"
                                 decision_explanation = f"No hay evidencia de diferencia con {reference_value} (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
                             
                             st.markdown(f"""
@@ -2906,7 +2902,7 @@ if df is not None:
                     st.error(f"Error en Wilcoxon Una Muestra: {e}")
         
         # ============================================================================
-        # CHI-CUADRADO (IMPLEMENTACIÓN COMPLETA)
+        # CHI-CUADRADO
         # ============================================================================
         
         elif nonpar_test == "Chi-cuadrado" and categorical_cols:
@@ -2961,7 +2957,7 @@ if df is not None:
                                 st.warning(f"⚠️ {percent_lt_5:.1f}% de celdas tienen frecuencia esperada < 5")
                                 st.info("**Recomendación:** Considerar prueba exacta de Fisher o agrupar categorías")
                             
-                            # MEJORA 1: Exportar resultados CSV
+                            # Exportar resultados CSV
                             resultados_chi = pd.DataFrame({
                                 'Prueba': ['Chi-cuadrado de independencia'],
                                 'Variable_fila': [chi_var1],
@@ -3005,16 +3001,16 @@ if df is not None:
                             row_pct = (contingency_table.div(contingency_table.sum(axis=1), axis=0) * 100).round(1)
                             st.dataframe(row_pct, use_container_width=True)
                             
-                            # MEJORA 2: SECCIÓN DE ANÁLISIS Y CONCLUSIONES
+                            # SECCIÓN DE ANÁLISIS Y CONCLUSIONES
                             with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
                                 
                                 # Decisión estadística
                                 if p_value < alpha_nonpar:
-                                    decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                    decision_text = "✅ **RECHAZAR la hipótesis nula**"
                                     decision_explanation = f"Existe asociación entre '{chi_var1}' y '{chi_var2}' (p = {p_value:.4f} < α = {alpha_nonpar})"
                                     color = "success"
                                 else:
-                                    decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                    decision_text = "⏸️ **NO RECHAZAR la hipótesis nula**"
                                     decision_explanation = f"No hay evidencia de asociación entre '{chi_var1}' y '{chi_var2}' (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
                                     color = "warning"
                                 
@@ -3212,7 +3208,7 @@ if df is not None:
                         st.error(f"Error en Chi-cuadrado: {e}")
         
         # ============================================================================
-        # WELCH (VARIANZAS DESIGUALES) - IMPLEMENTACIÓN COMPLETA
+        # WELCH (VARIANZAS DESIGUALES)
         # ============================================================================
         
         elif nonpar_test == "Welch (varianzas desiguales)" and numeric_cols and categorical_cols:
@@ -3330,10 +3326,10 @@ if df is not None:
                             with st.expander("📊 **Análisis y Conclusiones Detalladas**", expanded=True):
                                 # Decisión estadística
                                 if p_value < alpha_nonpar:
-                                    decision_text = "✅ **REJECTAR la hipótesis nula**"
+                                    decision_text = "✅ **RECHAZAR la hipótesis nula**"
                                     decision_explanation = f"Existe diferencia significativa entre medias (p = {p_value:.4f} < α = {alpha_nonpar})"
                                 else:
-                                    decision_text = "⏸️ **NO REJECTAR la hipótesis nula**"
+                                    decision_text = "⏸️ **NO RECHAZAR la hipótesis nula**"
                                     decision_explanation = f"No hay evidencia de diferencia significativa (p = {p_value:.4f} ≥ α = {alpha_nonpar})"
                                 
                                 st.markdown(f"""
